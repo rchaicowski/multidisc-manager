@@ -1,40 +1,48 @@
 import tkinter as tk
-from tkinter import filedialog, scrolledtext, messagebox
+from tkinter import filedialog, scrolledtext, messagebox, ttk
 import os
 import re
 from pathlib import Path
 import threading
+import subprocess
+import platform
+import shutil
 
 
-class M3UCreatorGUI:
+class MultiDiscManagerGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("M3U Creator")
-        self.root.geometry("750x600")
+        self.root.title("Multi-Disc Manager")
+        self.root.geometry("800x700")
         self.root.resizable(True, True)
         
         # Variables
         self.folder_path = tk.StringVar()
+        self.operation_mode = tk.StringVar(value="m3u")
         self.include_cue = tk.BooleanVar(value=True)
         self.include_chd = tk.BooleanVar(value=True)
         self.include_bin = tk.BooleanVar(value=False)
         
+        # CHD conversion options
+        self.delete_after_conversion = tk.BooleanVar(value=False)
+        
         self.create_widgets()
+        self.update_options_visibility()
         
     def create_widgets(self):
         # Title
         title_label = tk.Label(
             self.root, 
-            text="M3U Creator for Multi-Disc Games", 
-            font=("Arial", 16, "bold")
+            text="Multi-Disc Manager", 
+            font=("Arial", 18, "bold")
         )
         title_label.pack(pady=10)
         
         # Description
         desc_label = tk.Label(
             self.root,
-            text="Automatically create M3U playlist files for multi-disc PS1, PS2, Dreamcast, Saturn games",
-            font=("Arial", 9)
+            text="Create M3U playlists and convert disc images to CHD format",
+            font=("Arial", 10)
         )
         desc_label.pack(pady=5)
         
@@ -64,62 +72,128 @@ class M3UCreatorGUI:
         )
         browse_btn.pack(side="left")
         
-        # File type selection frame
-        filetype_frame = tk.LabelFrame(
+        # Operation mode selection
+        mode_frame = tk.LabelFrame(
             self.root,
-            text="File Types to Include",
+            text="What do you want to do?",
+            font=("Arial", 11, "bold"),
+            padx=20,
+            pady=15
+        )
+        mode_frame.pack(pady=10, padx=20, fill="x")
+        
+        m3u_radio = tk.Radiobutton(
+            mode_frame,
+            text="📁 Create M3U Playlists (for multi-disc games)",
+            variable=self.operation_mode,
+            value="m3u",
+            font=("Arial", 10),
+            command=self.update_options_visibility
+        )
+        m3u_radio.pack(anchor="w", pady=5)
+        
+        chd_radio = tk.Radiobutton(
+            mode_frame,
+            text="💾 Convert to CHD (compress disc images)",
+            variable=self.operation_mode,
+            value="chd",
+            font=("Arial", 10),
+            command=self.update_options_visibility
+        )
+        chd_radio.pack(anchor="w", pady=5)
+        
+        # Info button
+        info_btn = tk.Button(
+            mode_frame,
+            text="ℹ️ Help - When to use each?",
+            command=self.show_info,
+            font=("Arial", 9),
+            bg="#2196F3",
+            fg="white",
+            cursor="hand2"
+        )
+        info_btn.pack(anchor="w", pady=10)
+        
+        # Options frame (changes based on mode)
+        self.options_frame = tk.LabelFrame(
+            self.root,
+            text="Options",
             font=("Arial", 10, "bold"),
             padx=20,
             pady=10
         )
-        filetype_frame.pack(pady=10, padx=20, fill="x")
+        self.options_frame.pack(pady=10, padx=20, fill="x")
         
-        cue_check = tk.Checkbutton(
-            filetype_frame,
+        # M3U options
+        self.m3u_options = tk.Frame(self.options_frame)
+        
+        tk.Label(self.m3u_options, text="File types to include in M3U:", font=("Arial", 9)).pack(anchor="w", pady=5)
+        
+        tk.Checkbutton(
+            self.m3u_options,
             text="CUE files (.cue)",
             variable=self.include_cue,
-            font=("Arial", 10)
-        )
-        cue_check.pack(anchor="w", pady=2)
+            font=("Arial", 9)
+        ).pack(anchor="w", padx=20)
         
-        chd_check = tk.Checkbutton(
-            filetype_frame,
-            text="CHD files (.chd) - Compressed disc format",
+        tk.Checkbutton(
+            self.m3u_options,
+            text="CHD files (.chd)",
             variable=self.include_chd,
-            font=("Arial", 10)
-        )
-        chd_check.pack(anchor="w", pady=2)
+            font=("Arial", 9)
+        ).pack(anchor="w", padx=20)
         
-        bin_check = tk.Checkbutton(
-            filetype_frame,
-            text="BIN files (.bin) - Standalone disc images",
+        tk.Checkbutton(
+            self.m3u_options,
+            text="BIN files (.bin)",
             variable=self.include_bin,
-            font=("Arial", 10)
-        )
-        bin_check.pack(anchor="w", pady=2)
+            font=("Arial", 9)
+        ).pack(anchor="w", padx=20)
         
-        # Info label
-        info_label = tk.Label(
-            self.root,
-            text="💡 Tip: Most users should keep CUE and CHD enabled",
+        # CHD options
+        self.chd_options = tk.Frame(self.options_frame)
+        
+        tk.Label(
+            self.chd_options, 
+            text="Will convert all CUE/BIN files to CHD format",
+            font=("Arial", 9)
+        ).pack(anchor="w", pady=5)
+        
+        tk.Checkbutton(
+            self.chd_options,
+            text="⚠️ Delete original files after successful conversion",
+            variable=self.delete_after_conversion,
             font=("Arial", 9),
-            fg="gray"
-        )
-        info_label.pack(pady=5)
+            fg="red"
+        ).pack(anchor="w", pady=5)
         
-        # Create button
-        self.create_btn = tk.Button(
+        tk.Label(
+            self.chd_options,
+            text="(CHD files are compressed and save 40-60% space)",
+            font=("Arial", 8),
+            fg="gray"
+        ).pack(anchor="w")
+        
+        # Process button
+        self.process_btn = tk.Button(
             self.root,
-            text="▶ Create M3U Files",
-            command=self.run_creator,
+            text="▶ Process Files",
+            command=self.run_process,
             font=("Arial", 12, "bold"),
             bg="#2196F3",
             fg="white",
             cursor="hand2",
             height=2,
-            padx=20
+            padx=30
         )
-        self.create_btn.pack(pady=15)
+        self.process_btn.pack(pady=15)
+        
+        # Progress bar (hidden by default)
+        self.progress = ttk.Progressbar(
+            self.root,
+            mode='indeterminate',
+            length=300
+        )
         
         # Status/Log area
         log_label = tk.Label(self.root, text="Status Log:", font=("Arial", 10, "bold"))
@@ -127,7 +201,7 @@ class M3UCreatorGUI:
         
         self.log_text = scrolledtext.ScrolledText(
             self.root,
-            width=85,
+            width=90,
             height=15,
             font=("Consolas", 9),
             bg="#f5f5f5",
@@ -138,12 +212,102 @@ class M3UCreatorGUI:
         # Footer
         footer_label = tk.Label(
             self.root,
-            text="Works with PlayStation, Dreamcast, Saturn, and other multi-disc systems",
+            text="Supports PS1, PS2, Dreamcast, Saturn, and other disc-based systems",
             font=("Arial", 8),
             fg="gray"
         )
         footer_label.pack(pady=5)
         
+    def update_options_visibility(self):
+        """Show/hide options based on selected mode"""
+        self.m3u_options.pack_forget()
+        self.chd_options.pack_forget()
+        
+        if self.operation_mode.get() == "m3u":
+            self.m3u_options.pack(fill="x")
+            self.process_btn.config(text="▶ Create M3U Files")
+        else:
+            self.chd_options.pack(fill="x")
+            self.process_btn.config(text="▶ Convert to CHD")
+    
+    def show_info(self):
+        """Show information about when to use each option"""
+        info_text = """
+📁 CREATE M3U PLAYLISTS
+
+Use this when you have multi-disc games (games with Disc 1, Disc 2, etc.)
+
+What it does:
+• Creates playlist files (.m3u) that list all discs for each game
+• Allows you to switch discs in your emulator during gameplay
+• Keeps your game library organized
+
+Best for:
+• PS1 games like Final Fantasy VII, VIII, IX
+• PS2 multi-disc games
+• Dreamcast multi-disc games
+• Sega Saturn multi-disc games
+
+Example: If you have:
+  - Final Fantasy VII (Disc 1).cue
+  - Final Fantasy VII (Disc 2).cue
+  - Final Fantasy VII (Disc 3).cue
+  
+It creates: Final Fantasy VII.m3u
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💾 CONVERT TO CHD
+
+Use this to compress your disc images and save space
+
+What it does:
+• Converts CUE/BIN files to CHD (Compressed Hunks of Data)
+• Reduces file size by 40-60%
+• Improves loading times in some emulators
+• Preserves all game data perfectly
+
+Best for:
+• Saving hard drive space
+• Faster game loading
+• RetroArch and most modern emulators support CHD
+
+Example: 
+  Game.cue (1 KB) + Game.bin (700 MB)
+  → Game.chd (300-400 MB)
+
+⚠️ Note: Always keep backups before converting!
+        """
+        
+        info_window = tk.Toplevel(self.root)
+        info_window.title("Help - When to use each option")
+        info_window.geometry("600x650")
+        
+        text_widget = scrolledtext.ScrolledText(
+            info_window,
+            width=70,
+            height=35,
+            font=("Arial", 10),
+            wrap=tk.WORD,
+            padx=15,
+            pady=15
+        )
+        text_widget.pack(fill="both", expand=True, padx=10, pady=10)
+        text_widget.insert(1.0, info_text)
+        text_widget.config(state="disabled")
+        
+        close_btn = tk.Button(
+            info_window,
+            text="Close",
+            command=info_window.destroy,
+            font=("Arial", 10),
+            bg="#4CAF50",
+            fg="white",
+            cursor="hand2",
+            padx=20
+        )
+        close_btn.pack(pady=10)
+    
     def browse_folder(self):
         folder = filedialog.askdirectory(title="Select Game Folder")
         if folder:
@@ -155,7 +319,7 @@ class M3UCreatorGUI:
         self.log_text.see(tk.END)
         self.root.update_idletasks()
     
-    def run_creator(self):
+    def run_process(self):
         folder = self.folder_path.get()
         
         if not folder:
@@ -166,19 +330,152 @@ class M3UCreatorGUI:
             messagebox.showerror("Error", "Selected folder does not exist!")
             return
         
-        if not self.include_cue.get() and not self.include_chd.get() and not self.include_bin.get():
-            messagebox.showwarning("No File Types", "Please select at least one file type to include!")
-            return
+        mode = self.operation_mode.get()
+        
+        if mode == "m3u":
+            if not self.include_cue.get() and not self.include_chd.get() and not self.include_bin.get():
+                messagebox.showwarning("No File Types", "Please select at least one file type!")
+                return
         
         # Clear log
         self.log_text.delete(1.0, tk.END)
         
         # Disable button during processing
-        self.create_btn.config(state="disabled", text="Processing...")
+        self.process_btn.config(state="disabled", text="Processing...")
+        self.progress.pack(pady=5)
+        self.progress.start()
         
         # Run in separate thread
-        thread = threading.Thread(target=self.create_m3u_files, args=(folder,))
+        if mode == "m3u":
+            thread = threading.Thread(target=self.create_m3u_files, args=(folder,))
+        else:
+            thread = threading.Thread(target=self.convert_to_chd, args=(folder,))
         thread.start()
+    
+    def convert_to_chd(self, folder):
+        """Convert CUE/BIN files to CHD format"""
+        try:
+            self.log("=" * 70)
+            self.log("CHD CONVERTER - STARTING")
+            self.log("=" * 70)
+            self.log(f"Target folder: {folder}\n")
+            
+            # Check for chdman
+            chdman_path = self.find_chdman()
+            if not chdman_path:
+                self.log("❌ ERROR: chdman not found!")
+                self.log("\nchdman is required for CHD conversion.")
+                self.log("The tool will be bundled in future releases.")
+                self.log("\nFor now, please install MAME (includes chdman):")
+                self.log("  Windows: https://www.mamedev.org/release.html")
+                self.log("  Linux: sudo apt install mame-tools")
+                messagebox.showerror(
+                    "chdman Not Found",
+                    "chdman is required for CHD conversion.\n\n"
+                    "Please install MAME or mame-tools package.\n"
+                    "See the log for installation instructions."
+                )
+                return
+            
+            self.log(f"✓ Found chdman: {chdman_path}\n")
+            
+            # Find all CUE files
+            cue_files = list(Path(folder).glob("*.cue"))
+            
+            if not cue_files:
+                self.log("❌ No CUE files found in the folder.")
+                messagebox.showinfo("No Files", "No CUE files found to convert.")
+                return
+            
+            self.log(f"Found {len(cue_files)} CUE file(s) to convert\n")
+            
+            converted = 0
+            failed = 0
+            
+            for cue_file in cue_files:
+                cue_path = str(cue_file)
+                chd_path = cue_path.rsplit('.', 1)[0] + '.chd'
+                
+                # Skip if CHD already exists
+                if os.path.exists(chd_path):
+                    self.log(f"⏭️  Skipping {cue_file.name} (CHD already exists)")
+                    continue
+                
+                self.log(f"🔄 Converting: {cue_file.name}")
+                
+                try:
+                    # Run chdman
+                    result = subprocess.run(
+                        [chdman_path, 'createcd', '-i', cue_path, '-o', chd_path],
+                        capture_output=True,
+                        text=True,
+                        timeout=300  # 5 minute timeout per file
+                    )
+                    
+                    if result.returncode == 0:
+                        self.log(f"   ✓ Success: {os.path.basename(chd_path)}")
+                        converted += 1
+                        
+                        # Delete original files if option is enabled
+                        if self.delete_after_conversion.get():
+                            try:
+                                os.remove(cue_path)
+                                # Find and remove associated BIN files
+                                bin_file = cue_path.rsplit('.', 1)[0] + '.bin'
+                                if os.path.exists(bin_file):
+                                    os.remove(bin_file)
+                                self.log(f"   🗑️  Deleted original files")
+                            except Exception as e:
+                                self.log(f"   ⚠️  Could not delete originals: {e}")
+                    else:
+                        self.log(f"   ❌ Failed: {result.stderr[:100]}")
+                        failed += 1
+                
+                except subprocess.TimeoutExpired:
+                    self.log(f"   ❌ Timeout - file too large or chdman hung")
+                    failed += 1
+                except Exception as e:
+                    self.log(f"   ❌ Error: {str(e)}")
+                    failed += 1
+                
+                self.log("")
+            
+            self.log("=" * 70)
+            self.log("✅ CONVERSION COMPLETE!")
+            self.log(f"  • Successfully converted: {converted}")
+            self.log(f"  • Failed: {failed}")
+            self.log("=" * 70)
+            
+            messagebox.showinfo(
+                "Conversion Complete",
+                f"CHD conversion finished!\n\nConverted: {converted}\nFailed: {failed}"
+            )
+        
+        except Exception as e:
+            self.log(f"\n❌ ERROR: {str(e)}")
+            messagebox.showerror("Error", f"An error occurred:\n{str(e)}")
+        
+        finally:
+            self.progress.stop()
+            self.progress.pack_forget()
+            self.process_btn.config(state="normal")
+            self.update_options_visibility()
+    
+    def find_chdman(self):
+        """Try to find chdman executable"""
+        # Check if bundled with app (future)
+        bundled_path = os.path.join(os.path.dirname(__file__), 'tools', 
+                                    'chdman.exe' if platform.system() == 'Windows' else 'chdman')
+        if os.path.exists(bundled_path):
+            return bundled_path
+        
+        # Check if in system PATH
+        chdman_name = 'chdman.exe' if platform.system() == 'Windows' else 'chdman'
+        chdman_path = shutil.which(chdman_name)
+        if chdman_path:
+            return chdman_path
+        
+        return None
     
     def extract_game_info(self, filename):
         """Extract game name and disc number from filename."""
@@ -259,9 +556,9 @@ class M3UCreatorGUI:
     
     def create_m3u_files(self, folder):
         try:
-            self.log("=" * 60)
+            self.log("=" * 70)
             self.log("M3U CREATOR - STARTING")
-            self.log("=" * 60)
+            self.log("=" * 70)
             self.log(f"Target folder: {folder}\n")
             
             multidisc_games = self.find_multidisc_games(folder)
@@ -272,7 +569,7 @@ class M3UCreatorGUI:
                 self.log("  • Game Name (Disc 1).cue")
                 self.log("  • Game Name (Disc 2).chd")
                 self.log("  • Game Name [Disc 1].bin")
-                messagebox.showinfo("No Games Found", "No multi-disc games were found in the selected folder.")
+                messagebox.showinfo("No Games Found", "No multi-disc games were found.")
             else:
                 self.log(f"🎮 Found {len(multidisc_games)} multi-disc game(s)\n")
                 
@@ -286,11 +583,11 @@ class M3UCreatorGUI:
                         skipped_count += 1
                     self.log("")
                 
-                self.log("=" * 60)
+                self.log("=" * 70)
                 self.log("✅ COMPLETED SUCCESSFULLY!")
                 self.log(f"  • M3U files created: {created_count}")
                 self.log(f"  • Already existed (skipped): {skipped_count}")
-                self.log("=" * 60)
+                self.log("=" * 70)
                 
                 messagebox.showinfo(
                     "Success!", 
@@ -302,10 +599,13 @@ class M3UCreatorGUI:
             messagebox.showerror("Error", f"An error occurred:\n{str(e)}")
         
         finally:
-            self.create_btn.config(state="normal", text="▶ Create M3U Files")
+            self.progress.stop()
+            self.progress.pack_forget()
+            self.process_btn.config(state="normal")
+            self.update_options_visibility()
 
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = M3UCreatorGUI(root)
+    app = MultiDiscManagerGUI(root)
     root.mainloop()
