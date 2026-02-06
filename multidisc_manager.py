@@ -18,8 +18,8 @@ class MultiDiscManagerGUI:
         
         # Variables
         self.folder_path = tk.StringVar()
-        self.operation_mode = tk.StringVar(value="m3u")
-        self.m3u_file_type = tk.StringVar(value="cue")  # Radio button for M3U file type
+        self.operation_mode = tk.StringVar(value="chd")
+        self.m3u_file_type = tk.StringVar(value="all")  # For M3U: all supported formats
         
         # CHD conversion options
         self.delete_after_conversion = tk.BooleanVar(value=False)
@@ -80,6 +80,16 @@ class MultiDiscManagerGUI:
         )
         mode_frame.pack(pady=10, padx=20, fill="x")
         
+        chd_radio = tk.Radiobutton(
+            mode_frame,
+            text="💾 Convert to CHD (compress disc images)",
+            variable=self.operation_mode,
+            value="chd",
+            font=("Arial", 10),
+            command=self.update_options_visibility
+        )
+        chd_radio.pack(anchor="w", pady=5)
+        
         m3u_radio = tk.Radiobutton(
             mode_frame,
             text="📁 Create M3U Playlists (for multi-disc games)",
@@ -90,15 +100,15 @@ class MultiDiscManagerGUI:
         )
         m3u_radio.pack(anchor="w", pady=5)
         
-        chd_radio = tk.Radiobutton(
+        both_radio = tk.Radiobutton(
             mode_frame,
-            text="💾 Convert to CHD (compress disc images)",
+            text="🔄 Convert to CHD + Create M3U Playlists",
             variable=self.operation_mode,
-            value="chd",
+            value="both",
             font=("Arial", 10),
             command=self.update_options_visibility
         )
-        chd_radio.pack(anchor="w", pady=5)
+        both_radio.pack(anchor="w", pady=5)
         
         # Info button
         info_btn = tk.Button(
@@ -127,29 +137,20 @@ class MultiDiscManagerGUI:
         
         tk.Label(self.m3u_options, text="Create M3U playlists for:", font=("Arial", 9, "bold")).pack(anchor="w", pady=5)
         
-        tk.Radiobutton(
+        tk.Label(
             self.m3u_options,
-            text="CUE files (.cue + .bin)",
-            variable=self.m3u_file_type,
-            value="cue",
-            font=("Arial", 9)
-        ).pack(anchor="w", padx=20, pady=2)
-        
-        tk.Radiobutton(
-            self.m3u_options,
-            text="CHD files (.chd)",
-            variable=self.m3u_file_type,
-            value="chd",
-            font=("Arial", 9)
-        ).pack(anchor="w", padx=20, pady=2)
+            text="Scans for: CUE, GDI, CDI, ISO, CHD files",
+            font=("Arial", 9),
+            fg="gray"
+        ).pack(anchor="w", padx=20, pady=5)
         
         info_frame = tk.Frame(self.m3u_options, bg="#e3f2fd", relief="ridge", borderwidth=1)
         info_frame.pack(fill="x", pady=10)
         
         tk.Label(
             info_frame,
-            text="ℹ️ Note: All disc files must be in the same folder and use\n"
-                 "    the same format (all CUE or all CHD, not mixed)",
+            text="ℹ️ Note: All disc files must be in the same folder.\n"
+                 "    Works with PSX, PS2, Dreamcast, Saturn, Sega CD, and more!",
             font=("Arial", 8),
             bg="#e3f2fd",
             fg="#1976d2",
@@ -161,8 +162,9 @@ class MultiDiscManagerGUI:
         
         tk.Label(
             self.chd_options, 
-            text="Will convert all CUE/BIN files to CHD format",
-            font=("Arial", 9)
+            text="Converts: CUE, GDI, CDI, ISO → CHD format",
+            font=("Arial", 9),
+            fg="gray"
         ).pack(anchor="w", pady=5)
         
         tk.Checkbutton(
@@ -179,6 +181,43 @@ class MultiDiscManagerGUI:
             font=("Arial", 8),
             fg="gray"
         ).pack(anchor="w")
+        
+        # Both options
+        self.both_options = tk.Frame(self.options_frame)
+        
+        tk.Label(
+            self.both_options,
+            text="Step 1: Convert all disc images to CHD",
+            font=("Arial", 9, "bold")
+        ).pack(anchor="w", pady=2)
+        
+        tk.Label(
+            self.both_options,
+            text="  Converts: CUE, GDI, CDI, ISO → CHD",
+            font=("Arial", 8),
+            fg="gray"
+        ).pack(anchor="w", padx=20)
+        
+        tk.Label(
+            self.both_options,
+            text="Step 2: Create M3U playlists for multi-disc games",
+            font=("Arial", 9, "bold")
+        ).pack(anchor="w", pady=(10,2))
+        
+        tk.Label(
+            self.both_options,
+            text="  Groups CHD files into playlists",
+            font=("Arial", 8),
+            fg="gray"
+        ).pack(anchor="w", padx=20)
+        
+        tk.Checkbutton(
+            self.both_options,
+            text="⚠️ Delete original files after successful conversion",
+            variable=self.delete_after_conversion,
+            font=("Arial", 9),
+            fg="red"
+        ).pack(anchor="w", pady=(10,5))
         
         # Process button
         self.process_btn = tk.Button(
@@ -228,13 +267,19 @@ class MultiDiscManagerGUI:
         """Show/hide options based on selected mode"""
         self.m3u_options.pack_forget()
         self.chd_options.pack_forget()
+        self.both_options.pack_forget()
         
-        if self.operation_mode.get() == "m3u":
-            self.m3u_options.pack(fill="x")
-            self.process_btn.config(text="▶ Create M3U Files")
-        else:
+        mode = self.operation_mode.get()
+        
+        if mode == "chd":
             self.chd_options.pack(fill="x")
             self.process_btn.config(text="▶ Convert to CHD")
+        elif mode == "m3u":
+            self.m3u_options.pack(fill="x")
+            self.process_btn.config(text="▶ Create M3U Files")
+        else:  # both
+            self.both_options.pack(fill="x")
+            self.process_btn.config(text="▶ Convert & Create M3U")
     
     def show_info(self):
         """Show information about when to use each option"""
@@ -249,7 +294,7 @@ What it does:
 • Keeps your game library organized
 
 Best for:
-• PS1 multi-disc games
+• PS1 games like Final Fantasy VII, VIII, IX
 • PS2 multi-disc games
 • Dreamcast multi-disc games
 • Sega Saturn multi-disc games
@@ -351,12 +396,14 @@ Example:
         # Run in separate thread
         if mode == "m3u":
             thread = threading.Thread(target=self.create_m3u_files, args=(folder,))
-        else:
+        elif mode == "chd":
             thread = threading.Thread(target=self.convert_to_chd, args=(folder,))
+        else:  # both
+            thread = threading.Thread(target=self.convert_and_create_m3u, args=(folder,))
         thread.start()
     
     def convert_to_chd(self, folder):
-        """Convert CUE/BIN files to CHD format"""
+        """Convert CUE/GDI/CDI/ISO files to CHD format"""
         try:
             self.log("=" * 70)
             self.log("CHD CONVERTER - STARTING")
@@ -382,37 +429,49 @@ Example:
             
             self.log(f"✓ Found chdman: {chdman_path}\n")
             
-            # Find all CUE files
-            cue_files = list(Path(folder).glob("*.cue"))
+            # Find all convertible files
+            source_files = []
+            for pattern in ["*.cue", "*.gdi", "*.cdi", "*.iso"]:
+                found = list(Path(folder).glob(pattern))
+                if found:
+                    self.log(f"Found {len(found)} {pattern} file(s)")
+                    source_files.extend(found)
             
-            if not cue_files:
-                self.log("❌ No CUE files found in the folder.")
-                messagebox.showinfo("No Files", "No CUE files found to convert.")
+            if not source_files:
+                self.log("\n❌ No convertible files found.")
+                self.log("Supported formats: CUE, GDI, CDI, ISO")
+                messagebox.showinfo("No Files", "No convertible disc images found.")
                 return
             
-            self.log(f"Found {len(cue_files)} CUE file(s) to convert\n")
+            self.log(f"\nTotal files to convert: {len(source_files)}\n")
             
             converted = 0
             failed = 0
             
-            for cue_file in cue_files:
-                cue_path = str(cue_file)
-                chd_path = cue_path.rsplit('.', 1)[0] + '.chd'
+            for source_file in source_files:
+                source_path = str(source_file)
+                source_ext = source_file.suffix.lower()
+                chd_path = str(source_file.with_suffix('.chd'))
                 
                 # Skip if CHD already exists
                 if os.path.exists(chd_path):
-                    self.log(f"⏭️  Skipping {cue_file.name} (CHD already exists)")
+                    self.log(f"⏭️  Skipping {source_file.name} (CHD already exists)")
                     continue
                 
-                self.log(f"🔄 Converting: {cue_file.name}")
+                self.log(f"🔄 Converting: {source_file.name}")
                 
                 try:
-                    # Run chdman
+                    # Different chdman commands for different formats
+                    if source_ext in ['.cue', '.gdi', '.cdi']:
+                        cmd = [chdman_path, 'createcd', '-i', source_path, '-o', chd_path]
+                    else:  # .iso
+                        cmd = [chdman_path, 'createcd', '-i', source_path, '-o', chd_path]
+                    
                     result = subprocess.run(
-                        [chdman_path, 'createcd', '-i', cue_path, '-o', chd_path],
+                        cmd,
                         capture_output=True,
                         text=True,
-                        timeout=300  # 5 minute timeout per file
+                        timeout=300
                     )
                     
                     if result.returncode == 0:
@@ -422,20 +481,21 @@ Example:
                         # Delete original files if option is enabled
                         if self.delete_after_conversion.get():
                             try:
-                                os.remove(cue_path)
-                                # Find and remove associated BIN files
-                                bin_file = cue_path.rsplit('.', 1)[0] + '.bin'
-                                if os.path.exists(bin_file):
-                                    os.remove(bin_file)
+                                os.remove(source_path)
+                                # For CUE files, also remove associated BIN files
+                                if source_ext == '.cue':
+                                    bin_file = source_path.rsplit('.', 1)[0] + '.bin'
+                                    if os.path.exists(bin_file):
+                                        os.remove(bin_file)
                                 self.log(f"   🗑️  Deleted original files")
                             except Exception as e:
                                 self.log(f"   ⚠️  Could not delete originals: {e}")
                     else:
-                        self.log(f"   ❌ Failed: {result.stderr[:100]}")
+                        self.log(f"   ❌ Failed: {result.stderr[:150]}")
                         failed += 1
                 
                 except subprocess.TimeoutExpired:
-                    self.log(f"   ❌ Timeout - file too large or chdman hung")
+                    self.log(f"   ❌ Timeout - conversion took too long")
                     failed += 1
                 except Exception as e:
                     self.log(f"   ❌ Error: {str(e)}")
@@ -484,17 +544,33 @@ Example:
         """Extract game name and disc number from filename."""
         name_without_ext = os.path.splitext(filename)[0]
         
+        # Expanded patterns to handle more variations
         patterns = [
-            r'(.*?)[\s\-_]*\(Dis[ck]\s*(\d+)\)',
-            r'(.*?)[\s\-_]*\[Dis[ck]\s*(\d+)\]',
-            r'(.*?)[\s\-_]*Dis[ck]\s*(\d+)',
+            # Standard disc patterns
+            r'(.*?)[\s\-_]*\(Dis[ck]\s*(\d+)\)',      # (Disc 1) or (Disk 1)
+            r'(.*?)[\s\-_]*\[Dis[ck]\s*(\d+)\]',      # [Disc 1] or [Disk 1]
+            r'(.*?)[\s\-_]*Dis[ck]\s*(\d+)',          # Disc 1 or Disk 1
+            # CD patterns
+            r'(.*?)[\s\-_]*\(CD\s*(\d+)\)',           # (CD1) or (CD 1)
+            r'(.*?)[\s\-_]*\[CD\s*(\d+)\]',           # [CD1] or [CD 1]
+            r'(.*?)[\s\-_]*CD\s*(\d+)',               # CD1 or CD 1
+            # Side/Disk letter patterns (A=1, B=2, etc.)
+            r'(.*?)[\s\-_]*\((?:Side|Dis[ck])\s*([A-Z])\)',  # (Side A) or (Disk A)
+            r'(.*?)[\s\-_]*\[(?:Side|Dis[ck])\s*([A-Z])\]',  # [Side A] or [Disk A]
         ]
         
-        for pattern in patterns:
+        for i, pattern in enumerate(patterns):
             match = re.match(pattern, name_without_ext, re.IGNORECASE)
             if match:
                 game_name = match.group(1).strip()
-                disc_num = int(match.group(2))
+                disc_identifier = match.group(2)
+                
+                # Convert letter to number (A=1, B=2, etc.) for last two patterns
+                if i >= 6:  # Letter-based patterns
+                    disc_num = ord(disc_identifier.upper()) - ord('A') + 1
+                else:
+                    disc_num = int(disc_identifier)
+                
                 return game_name, disc_num
         
         return None, None
@@ -503,17 +579,20 @@ Example:
         """Scan folder for multi-disc games and group them."""
         games = {}
         
-        # Get selected file type
-        file_type = self.m3u_file_type.get()
-        extension = "*.cue" if file_type == "cue" else "*.chd"
+        # All supported disc image formats
+        extensions = ["*.cue", "*.gdi", "*.cdi", "*.iso", "*.chd"]
         
-        self.log(f"Scanning for {extension} files only")
+        self.log(f"Scanning for all supported formats: {', '.join(extensions)}")
         self.log("-" * 60)
         
-        files = list(Path(folder).glob(extension))
-        self.log(f"Found {len(files)} {extension} file(s)")
+        all_files = []
+        for ext_pattern in extensions:
+            files = list(Path(folder).glob(ext_pattern))
+            if files:
+                self.log(f"Found {len(files)} {ext_pattern} file(s)")
+                all_files.extend(files)
         
-        for file in files:
+        for file in all_files:
             filename = file.name
             game_name, disc_num = self.extract_game_info(filename)
             
@@ -529,11 +608,12 @@ Example:
         for name, files in games.items():
             if len(files) > 1:
                 # Check if all files have the same extension
-                extensions = set(os.path.splitext(f[1])[1].lower() for f in files)
-                if len(extensions) == 1:
+                extensions_used = set(os.path.splitext(f[1])[1].lower() for f in files)
+                if len(extensions_used) == 1:
                     multidisc_games[name] = files
                 else:
-                    self.log(f"⚠️  Skipping '{name}' - mixed formats detected (discs use different file types)")
+                    self.log(f"⚠️  Skipping '{name}' - mixed formats detected")
+                    self.log(f"    Formats found: {', '.join(extensions_used)}")
         
         # Sort disc files by disc number
         for game_name in multidisc_games:
@@ -599,6 +679,116 @@ Example:
                     "Success!", 
                     f"M3U creation complete!\n\nCreated: {created_count}\nSkipped: {skipped_count}"
                 )
+        
+        except Exception as e:
+            self.log(f"\n❌ ERROR: {str(e)}")
+            messagebox.showerror("Error", f"An error occurred:\n{str(e)}")
+        
+        finally:
+            self.progress.stop()
+            self.progress.pack_forget()
+            self.process_btn.config(state="normal")
+            self.update_options_visibility()
+    
+    def convert_and_create_m3u(self, folder):
+        """Convert to CHD then create M3U playlists"""
+        try:
+            self.log("=" * 70)
+            self.log("CONVERT TO CHD + CREATE M3U - STARTING")
+            self.log("=" * 70)
+            self.log(f"Target folder: {folder}\n")
+            
+            # Step 1: Convert to CHD
+            self.log("STEP 1: Converting disc images to CHD")
+            self.log("-" * 70)
+            
+            # Check for chdman
+            chdman_path = self.find_chdman()
+            if not chdman_path:
+                self.log("❌ ERROR: chdman not found!")
+                self.log("\nCannot proceed without chdman.")
+                messagebox.showerror("chdman Not Found", "chdman is required. See log for details.")
+                return
+            
+            self.log(f"✓ Found chdman: {chdman_path}")
+            
+            # Find all convertible files
+            source_files = []
+            for pattern in ["*.cue", "*.gdi", "*.cdi", "*.iso"]:
+                found = list(Path(folder).glob(pattern))
+                if found:
+                    source_files.extend(found)
+            
+            if source_files:
+                self.log(f"Found {len(source_files)} file(s) to convert\n")
+                
+                converted = 0
+                for source_file in source_files:
+                    source_path = str(source_file)
+                    chd_path = str(source_file.with_suffix('.chd'))
+                    
+                    if os.path.exists(chd_path):
+                        self.log(f"⏭️  {source_file.name} (CHD exists)")
+                        continue
+                    
+                    self.log(f"🔄 {source_file.name}")
+                    
+                    try:
+                        result = subprocess.run(
+                            [chdman_path, 'createcd', '-i', source_path, '-o', chd_path],
+                            capture_output=True,
+                            text=True,
+                            timeout=300
+                        )
+                        
+                        if result.returncode == 0:
+                            self.log(f"   ✓ Converted to CHD")
+                            converted += 1
+                            
+                            if self.delete_after_conversion.get():
+                                try:
+                                    os.remove(source_path)
+                                    if source_file.suffix.lower() == '.cue':
+                                        bin_file = str(source_file.with_suffix('.bin'))
+                                        if os.path.exists(bin_file):
+                                            os.remove(bin_file)
+                                    self.log(f"   🗑️  Deleted originals")
+                                except:
+                                    pass
+                        else:
+                            self.log(f"   ❌ Conversion failed")
+                    except:
+                        self.log(f"   ❌ Error during conversion")
+                
+                self.log(f"\nConverted {converted} file(s) to CHD")
+            else:
+                self.log("No files found to convert")
+            
+            # Step 2: Create M3U playlists
+            self.log("\n" + "=" * 70)
+            self.log("STEP 2: Creating M3U playlists")
+            self.log("-" * 70 + "\n")
+            
+            multidisc_games = self.find_multidisc_games(folder)
+            
+            if multidisc_games:
+                self.log(f"Found {len(multidisc_games)} multi-disc game(s)\n")
+                
+                created = 0
+                for game_name, disc_files in multidisc_games.items():
+                    if self.create_m3u_file(game_name, disc_files, folder):
+                        created += 1
+                    self.log("")
+                
+                self.log(f"Created {created} M3U playlist(s)")
+            else:
+                self.log("No multi-disc games found")
+            
+            self.log("\n" + "=" * 70)
+            self.log("✅ ALL OPERATIONS COMPLETE!")
+            self.log("=" * 70)
+            
+            messagebox.showinfo("Complete!", "CHD conversion and M3U creation finished!")
         
         except Exception as e:
             self.log(f"\n❌ ERROR: {str(e)}")
