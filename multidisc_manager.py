@@ -37,7 +37,37 @@ class MultiDiscManagerGUI:
         # CHD conversion options
         self.delete_after_conversion = tk.BooleanVar(value=False)
         
+        # Sound options
+        self.sounds_enabled = tk.BooleanVar(value=True)
+        self.load_sounds()
+        
         self.create_widgets()
+    
+    def load_sounds(self):
+        """Check if sound files exist"""
+        sounds_dir = os.path.join(os.path.dirname(__file__), 'sounds')
+        self.success_sound_path = os.path.join(sounds_dir, 'success.wav')
+        self.fail_sound_path = os.path.join(sounds_dir, 'fail.wav')
+    
+    def play_sound(self, sound_type):
+        """Play a sound if enabled using OS commands"""
+        if not self.sounds_enabled.get():
+            return
+        
+        sound_path = self.success_sound_path if sound_type == "success" else self.fail_sound_path
+        
+        if not os.path.exists(sound_path):
+            return
+        
+        try:
+            if platform.system() == 'Windows':
+                import winsound
+                winsound.PlaySound(sound_path, winsound.SND_FILENAME | winsound.SND_ASYNC)
+            else:
+                # Linux: Just fire and forget with &
+                os.system(f'aplay "{sound_path}" >/dev/null 2>&1 &')
+        except Exception as e:
+            pass
     
     def update_status(self, message, progress=None, total=None):
         """Update the status label and progress bar"""
@@ -75,6 +105,8 @@ class MultiDiscManagerGUI:
                 bg=self.accent_green,
                 state="normal"
             )
+            # Play success sound - schedule in main thread
+            self.root.after(100, lambda: self.play_sound("success"))
         else:
             self.status_label.config(
                 text="⚠️ Completed with errors - check log",
@@ -86,6 +118,8 @@ class MultiDiscManagerGUI:
                 bg=self.accent_red,
                 state="normal"
             )
+            # Play fail sound - schedule in main thread
+            self.root.after(100, lambda: self.play_sound("fail"))
         
         # Keep status visible but hide progress
         self.progress_frame.pack_forget()
@@ -495,15 +529,39 @@ class MultiDiscManagerGUI:
         )
         self.log_text.pack(fill="both", expand=True, padx=1, pady=1)
         
-        # Footer
+        # Footer with sound toggle
+        footer_frame = tk.Frame(self.root, bg=self.bg_dark)
+        footer_frame.pack(pady=(10, 15))
+        
+        def test_sound():
+            """Test sound when checkbox is toggled"""
+            if self.sounds_enabled.get():
+                self.play_sound("success")
+        
+        sound_check = tk.Checkbutton(
+            footer_frame,
+            text="🔔 Enable sounds",
+            variable=self.sounds_enabled,
+            command=test_sound,  # Play sound when toggled
+            font=("Arial", 9),
+            bg=self.bg_dark,
+            fg=self.text_gray,
+            selectcolor=self.bg_dark,
+            activebackground=self.bg_dark,
+            activeforeground=self.text_light,
+            bd=0,
+            highlightthickness=0
+        )
+        sound_check.pack(side="left", padx=(0, 15))
+        
         footer_label = tk.Label(
-            self.root,
+            footer_frame,
             text="Supports PS1, PS2, Dreamcast, Saturn, and other disc-based systems",
             font=("Arial", 9),
             fg=self.text_gray,
             bg=self.bg_dark
         )
-        footer_label.pack(pady=(10, 15))
+        footer_label.pack(side="left")
         
         # Initialize UI state
         self.update_options_visibility()
