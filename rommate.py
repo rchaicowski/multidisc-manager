@@ -7,7 +7,8 @@ import threading
 import subprocess
 import platform
 import shutil
-
+from gui.theme import Theme
+from utils.sounds import SoundPlayer
 
 class RomMateGUI:
     def __init__(self, root):
@@ -16,15 +17,15 @@ class RomMateGUI:
         self.root.geometry("850x870")
         self.root.resizable(True, True)
         
-        # Dark mode colors
-        self.bg_dark = "#2b2b2b"
-        self.bg_frame = "#3c3c3c"
-        self.text_light = "#e0e0e0"
-        self.text_gray = "#9e9e9e"
-        self.accent_blue = "#42a5f5"
-        self.accent_green = "#66bb6a"
-        self.accent_red = "#ef5350"
-        self.accent_orange = "#ff9800"
+        # Use theme colors
+        self.bg_dark = Theme.BG_DARK
+        self.bg_frame = Theme.BG_FRAME
+        self.text_light = Theme.TEXT_LIGHT
+        self.text_gray = Theme.TEXT_GRAY
+        self.accent_blue = Theme.ACCENT_BLUE
+        self.accent_green = Theme.ACCENT_GREEN
+        self.accent_red = Theme.ACCENT_RED
+        self.accent_orange = Theme.ACCENT_ORANGE
         
         # Configure root background
         self.root.configure(bg=self.bg_dark)
@@ -37,9 +38,9 @@ class RomMateGUI:
         # CHD conversion options
         self.delete_after_conversion = tk.BooleanVar(value=False)
         
-        # Sound options
-        self.sounds_enabled = tk.BooleanVar(value=True)
-        self.load_sounds()
+        # Sound player
+        self.sound_player = SoundPlayer()
+        self.sounds_enabled = tk.BooleanVar(value=self.sound_player.sounds_enabled)
         
         # Processing state
         self.is_processing = False
@@ -48,53 +49,6 @@ class RomMateGUI:
         self.spinner_index = 0
         
         self.create_widgets()
-    
-    def load_sounds(self):
-        """Check if sound files exist and store their paths"""
-        sounds_dir = os.path.join(os.path.dirname(__file__), 'sounds')
-        self.success_sound_path = os.path.join(sounds_dir, 'success.wav')
-        self.fail_sound_path = os.path.join(sounds_dir, 'fail.wav')
-        
-        # Check if sounds directory and files exist
-        self.sounds_available = (
-            os.path.exists(self.success_sound_path) and 
-            os.path.exists(self.fail_sound_path)
-        )
-        
-        if not self.sounds_available:
-            print(f"Warning: Sound files not found in {sounds_dir}")
-    
-    def play_sound(self, sound_type):
-        """Play a sound if enabled and available"""
-        if not self.sounds_enabled.get() or not self.sounds_available:
-            return
-        
-        sound_path = self.success_sound_path if sound_type == "success" else self.fail_sound_path
-        
-        if not os.path.exists(sound_path):
-            return
-        
-        try:
-            if platform.system() == 'Windows':
-                import winsound
-                # Play sound asynchronously without blocking
-                winsound.PlaySound(sound_path, winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
-            elif platform.system() == 'Darwin':  # macOS
-                # Use afplay on macOS
-                subprocess.Popen(['afplay', sound_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            else:  # Linux
-                # Try multiple Linux audio players
-                for player in ['aplay', 'paplay', 'ffplay']:
-                    if shutil.which(player):
-                        if player == 'ffplay':
-                            subprocess.Popen([player, '-nodisp', '-autoexit', sound_path], 
-                                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                        else:
-                            subprocess.Popen([player, sound_path], 
-                                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                        break
-        except Exception as e:
-            print(f"Could not play sound: {e}")
     
     def start_spinner(self):
         """Start the spinner animation"""
@@ -184,7 +138,7 @@ class RomMateGUI:
         self.stop_spinner()
         
         # Play sound
-        self.play_sound("success" if success else "fail")
+        self.sound_player.play("success" if success else "fail")
         
         if success:
             self.status_title.config(text="✅ Completed Successfully!", fg=self.accent_green)
@@ -529,16 +483,16 @@ class RomMateGUI:
         
         def test_sound():
             if self.sounds_enabled.get():
-                self.play_sound("success")
+                self.sound_player.play("success")
         
         sound_check = tk.Checkbutton(
             footer_frame,
-            text="🔔 Enable sounds" + ("" if self.sounds_available else " (sounds not found)"),
+            text="🔔 Enable sounds" + ("" if self.sound_player.sounds_available else " (sounds not found)"),
             variable=self.sounds_enabled,
             command=test_sound,
             font=("Arial", 9),
             bg=self.bg_dark,
-            fg=self.text_gray if self.sounds_available else self.accent_red,
+            fg=self.text_gray if self.sound_player.sounds_available else self.accent_red,
             selectcolor=self.bg_dark,
             activebackground=self.bg_dark,
             activeforeground=self.text_light,
