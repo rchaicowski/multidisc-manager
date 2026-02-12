@@ -11,7 +11,7 @@ from gui.theme import Theme
 from utils.sounds import SoundPlayer
 from core.file_utils import normalize_path, detect_available_formats
 from gui.dialogs import show_format_choice_dialog, show_info_dialog
-
+from core.chd_converter import CHDConverter 
 
 class RomMateGUI:
     def __init__(self, root):
@@ -43,8 +43,10 @@ class RomMateGUI:
 
         # Sound player
         self.sound_player = SoundPlayer()
-        self.sounds_enabled = tk.BooleanVar(
-            value=self.sound_player.sounds_enabled)
+        self.sounds_enabled = tk.BooleanVar(value=self.sound_player.sounds_enabled)
+
+        # CHD converter  ← Add these 2 lines
+        self.chd_converter = CHDConverter()
 
         # Processing state
         self.is_processing = False
@@ -700,316 +702,105 @@ class RomMateGUI:
         """Convert CUE/GDI/CDI/ISO files to CHD format"""
         try:
             self.update_processing_status(
-                "CHD Conversion", "Checking for chdman tool...", 0, 1
+                "CHD Conversion",
+                "Checking for chdman tool...",
+                0, 1
             )
-
+            
             # Check for chdman
-            chdman_path = self.find_chdman()
-            if not chdman_path:
+            self.chd_converter.chdman_path = self.chd_converter.find_chdman()
+            if not self.chd_converter.chdman_path:
                 self.log_to_processing("❌ ERROR: chdman not found!")
-
+                
                 # On Linux, offer to install automatically
-                if platform.system() == "Linux":
-                    if self.prompt_install_chdman():
-                        self.log_to_processing("⏳ Installation in progress.")
-                        self.log_to_processing(
-                            "Please complete installation in the terminal, then try again."
-                        )
+                if platform.system() == 'Linux':
+                    self.log_to_processing("\nOffering automatic installation...")
+                    if self.chd_converter.prompt_install_chdman():
+                        self.log_to_processing("\n⏳ Installation in progress.")
+                        self.log_to_processing("Please complete installation in the terminal, then try again.")
                     else:
-                        self.log_to_processing("❌ Installation cancelled.")
+                        self.log_to_processing("\n❌ Installation cancelled.")
                 else:
-                    self.log_to_processing(
-                        "chdman is required for CHD conversion.")
-                    self.log_to_processing(
-                        "It should be in the tools/ folder.")
+                    self.log_to_processing("\nchdman is required for CHD conversion.")
+                    self.log_to_processing("It should be in the tools/ folder.")
                     messagebox.showerror(
                         "chdman Not Found",
                         "chdman is required for CHD conversion.\n\n"
-                        "It should be bundled in the tools/ folder.",
+                        "It should be bundled in the tools/ folder."
                     )
-
+                
                 self.show_completion(success=False)
                 return
-
+            
             # Test if chdman actually works
             try:
                 test_result = subprocess.run(
-                    [chdman_path, "--help"], capture_output=True, text=True, timeout=5
+                    [self.chd_converter.chdman_path, '--help'],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
                 )
-
-                if test_result.returncode != 0 and platform.system() == "Linux":
-                    if "error while loading shared libraries" in test_result.stderr:
-                        self.log_to_processing(
-                            "❌ ERROR: chdman has missing dependencies!"
-                        )
-
-                        if self.prompt_install_chdman():
-                            self.log_to_processing(
-                                "⏳ Installation in progress.")
+                
+                if test_result.returncode != 0 and platform.system() == 'Linux':
+                    if 'error while loading shared libraries' in test_result.stderr:
+                        self.log_to_processing("❌ ERROR: chdman has missing dependencies!")
+                        self.log_to_processing(f"Error: {test_result.stderr[:150]}")
+                        
+                        if self.chd_converter.prompt_install_chdman():
+                            self.log_to_processing("\n⏳ Installation in progress.")
+                            self.log_to_processing("Please complete installation in the terminal, then try again.")
                         else:
-                            self.log_to_processing("❌ Installation cancelled.")
-
+                            self.log_to_processing("\n❌ Installation cancelled.")
+                        
                         self.show_completion(success=False)
                         return
             except Exception as e:
-                self.log_to_processing(
-                    f"⚠️ Warning: Could not test chdman: {e}")
-
-            self.log_to_processing(f"✓ Found chdman: {chdman_path}")
-
+                self.log_to_processing(f"⚠️ Warning: Could not test chdman: {e}")
+            
+            self.log_to_processing(f"✓ Found chdman: {self.chd_converter.chdman_path}")
+            
             self.update_processing_status(
-                "CHD Conversion", "Scanning for disc images..."
+                "CHD Conversion",
+                "Scanning for disc images..."
             )
-
-            # Find all convertible files
-            source_files = []
-            for pattern in ["*.cue", "*.gdi", "*.cdi", "*.iso"]:
-                found = list(Path(folder).glob(pattern))
-                if found:
-                    self.log_to_processing(
-                        f"Found {len(found)} {pattern} file(s)")
-                    source_files.extend(found)
-
-            if not source_files:
-                self.log_to_processing("❌ No convertible files found.")
+            
+            # Convert all files in folder
+            converted, skipped, failed = self.chd_converter.convert_folder(
+                folder,
+                delete_after=self.delete_after_conversion.get(),
+                log_callback=self.log_to_processing,
+                progress_callback=lambda current, total, filename: self.update_processing_status(
+                    "Converting to CHD",
+                    f"Processing file {current} of {total}",
+                    current,
+                    total,
+                    filename
+                )
+            )
+            
+            if converted == 0 and skipped == 0 and failed == 0:
+                self.log_to_processing("\n❌ No convertible files found.")
                 self.log_to_processing("Supported formats: CUE, GDI, CDI, ISO")
-                messagebox.showinfo(
-                    "No Files", "No convertible disc images found.")
+                messagebox.showinfo("No Files", "No convertible disc images found.")
                 self.show_completion(success=False)
                 return
-
-            total_files = len(source_files)
-            self.log_to_processing(
-                f"\nTotal files to convert: {total_files}\n")
-
-            converted = 0
-            failed = 0
-            skipped = 0
-
-            for index, source_file in enumerate(source_files, 1):
-                source_path = str(source_file)
-                source_ext = source_file.suffix.lower()
-                chd_path = str(source_file.with_suffix(".chd"))
-
-                # Update status
-                self.update_processing_status(
-                    "Converting to CHD",
-                    f"Processing file {index} of {total_files}",
-                    index,
-                    total_files,
-                    source_file.name,
-                )
-
-                # Skip if CHD already exists
-                if os.path.exists(chd_path):
-                    self.log_to_processing(
-                        f"⏭️  Skipped: {source_file.name} (CHD already exists)"
-                    )
-                    skipped += 1
-                    continue
-
-                self.log_to_processing(f"🔄 Converting: {source_file.name}")
-
-                # Add a processing indicator that updates
-                processing_msg = "   Processing"
-                self.log_to_processing(processing_msg)
-
-                # Keep track of log position for updating
-                log_position = self.processing_log.index("end-2c linestart")
-
-                try:
-                    import time
-
-                    cmd = [chdman_path, "createcd", "-i",
-                        source_path, "-o", chd_path]
-
-                    # Start conversion process
-                    process = subprocess.Popen(
-                        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-                    )
-
-                    # Animate dots while waiting
-                    dots = 0
-                    while process.poll() is None:
-                        dots = (dots + 1) % 4
-                        dot_str = "." * dots
-                        self.processing_log.config(state="normal")
-                        self.processing_log.delete(
-                            log_position, f"{log_position} lineend"
-                        )
-                        self.processing_log.insert(
-                            log_position, f"   Processing{dot_str}"
-                        )
-                        self.processing_log.config(state="disabled")
-                        self.root.update_idletasks()
-                        # Just wait for animation, not the process!
-                        time.sleep(0.3)
-
-                    # Get final result
-                    stdout, stderr = process.communicate()
-
-                    # Remove processing line
-                    self.processing_log.config(state="normal")
-                    self.processing_log.delete(
-                        f"{log_position} linestart", f"{log_position} lineend+1c"
-                    )
-                    self.processing_log.config(state="disabled")
-
-                    if process.returncode == 0:
-                        self.log_to_processing(
-                            f"   ✓ Success: {os.path.basename(chd_path)}"
-                        )
-                        converted += 1
-
-                        # Delete original files if option is enabled
-                        if self.delete_after_conversion.get():
-                            try:
-                                os.remove(source_path)
-                                if source_ext == ".cue":
-                                    bin_file = source_path.rsplit(".", 1)[
-                                                                  0] + ".bin"
-                                    if os.path.exists(bin_file):
-                                        os.remove(bin_file)
-                                self.log_to_processing(
-                                    f"   🗑️  Deleted original files")
-                            except Exception as e:
-                                self.log_to_processing(
-                                    f"   ⚠️  Could not delete originals: {e}"
-                                )
-                    else:
-                        self.log_to_processing(f"   ❌ Failed: {stderr[:100]}")
-                        failed += 1
-
-                except Exception as e:
-                    # Remove processing line if error
-                    try:
-                        self.processing_log.config(state="normal")
-                        self.processing_log.delete(
-                            f"{log_position} linestart", f"{log_position} lineend+1c"
-                        )
-                        self.processing_log.config(state="disabled")
-                    except:
-                        pass
-                    self.log_to_processing(f"   ❌ Error: {str(e)}")
-                    failed += 1
-
+            
             self.log_to_processing("\n" + "=" * 60)
-            self.log_to_processing(
-                f"✅ Converted: {converted} | ⏭️ Skipped: {skipped} | ❌ Failed: {failed}"
-            )
+            self.log_to_processing(f"✅ Converted: {converted} | ⏭️ Skipped: {skipped} | ❌ Failed: {failed}")
             self.log_to_processing("=" * 60)
-
+            
             success = failed == 0
-            self.show_completion(
-                success=success, converted=converted, skipped=skipped, failed=failed
+            self.show_completion(success=success, converted=converted, skipped=skipped, failed=failed)
+            
+            messagebox.showinfo(
+                "Conversion Complete",
+                f"CHD conversion finished!\n\nConverted: {converted}\nSkipped: {skipped}\nFailed: {failed}"
             )
-
+        
         except Exception as e:
             self.log_to_processing(f"\n❌ ERROR: {str(e)}")
             messagebox.showerror("Error", f"An error occurred:\n{str(e)}")
             self.show_completion(success=False)
-
-    def find_chdman(self):
-        """Try to find chdman executable"""
-        bundled_path = os.path.join(
-            os.path.dirname(__file__),
-            "tools",
-            "chdman.exe" if platform.system() == "Windows" else "chdman",
-        )
-        if os.path.exists(bundled_path):
-            return bundled_path
-
-        chdman_name = "chdman.exe" if platform.system() == "Windows" else "chdman"
-        chdman_path = shutil.which(chdman_name)
-        if chdman_path:
-            return chdman_path
-
-        return None
-
-    def get_install_command(self):
-        """Get the correct package manager command for this Linux distro"""
-        if platform.system() != "Linux":
-            return None
-
-        try:
-            with open("/etc/os-release", "r") as f:
-                os_info = f.read().lower()
-
-            if "ubuntu" in os_info or "debian" in os_info or "mint" in os_info:
-                return "sudo apt install mame-tools"
-            elif "fedora" in os_info or "rhel" in os_info or "centos" in os_info:
-                return "sudo dnf install mame"
-            elif "arch" in os_info or "manjaro" in os_info:
-                return "sudo pacman -S mame-tools"
-            elif "opensuse" in os_info:
-                return "sudo zypper install mame-tools"
-            else:
-                return "sudo apt install mame-tools"
-        except:
-            return "sudo apt install mame-tools"
-
-    def prompt_install_chdman(self):
-        """Prompt user to install chdman automatically"""
-        install_cmd = self.get_install_command()
-
-        if not install_cmd:
-            return False
-
-        response = messagebox.askyesno(
-            "First-Time Setup Required",
-            f"CHD conversion requires chdman.\n\n"
-            f"Would you like to install it now?\n"
-            f"(This will open a terminal and require your password)\n\n"
-            f"Command: {install_cmd}\n\n"
-            f"This is a one-time setup.",
-            icon="question",
-        )
-
-        if response:
-            try:
-                terminals = [
-                    ["gnome-terminal", "--"],
-                    ["konsole", "-e"],
-                    ["xfce4-terminal", "-e"],
-                    ["xterm", "-e"],
-                ]
-
-                install_script = f'{install_cmd}; echo "\n✅ Installation complete! Press Enter to close."; read'
-
-                terminal_opened = False
-                for terminal in terminals:
-                    try:
-                        subprocess.Popen(
-                            terminal + ["bash", "-c", install_script])
-                        terminal_opened = True
-                        break
-                    except FileNotFoundError:
-                        continue
-
-                if terminal_opened:
-                    messagebox.showinfo(
-                        "Installing...",
-                        "Please complete the installation in the terminal window.\n\n"
-                        "After installation, try CHD conversion again.",
-                    )
-                    return True
-                else:
-                    messagebox.showwarning(
-                        "Manual Installation Required",
-                        f"Could not open terminal automatically.\n\n"
-                        f"Please run this command manually:\n{install_cmd}\n\n"
-                        f"Then try CHD conversion again.",
-                    )
-                    return False
-            except Exception as e:
-                messagebox.showerror(
-                    "Installation Error",
-                    f"Could not start installation.\n\n"
-                    f"Please run manually:\n{install_cmd}",
-                )
-                return False
-
-        return False
 
     def extract_game_info(self, filename):
         """Extract game name and disc number from filename."""

@@ -217,6 +217,12 @@ class CHDConverter:
         Returns:
             tuple: (converted, skipped, failed) - counts of each outcome
         """
+        # Make sure chdman_path is set
+        if not self.chdman_path:
+            self.chdman_path = self.find_chdman()
+            if not self.chdman_path:
+                return 0, 0, 0
+        
         # Find all convertible files
         source_files = []
         for pattern in ["*.cue", "*.gdi", "*.cdi", "*.iso"]:
