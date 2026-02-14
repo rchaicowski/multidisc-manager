@@ -20,11 +20,23 @@ def show_format_choice_dialog(parent):
     choice_dialog.transient(parent)
     choice_dialog.grab_set()
     
-    # Center the dialog
+    # Center the dialog on parent window
     choice_dialog.update_idletasks()
-    x = (choice_dialog.winfo_screenwidth() // 2) - (500 // 2)
-    y = (choice_dialog.winfo_screenheight() // 2) - (250 // 2)
-    choice_dialog.geometry(f"500x250+{x}+{y}")
+    parent.update_idletasks()
+
+    # Get parent window position and size
+    parent_x = parent.winfo_x()
+    parent_y = parent.winfo_y()
+    parent_width = parent.winfo_width()
+    parent_height = parent.winfo_height()
+
+    # Calculate center position
+    dialog_width = 500
+    dialog_height = 280
+    x = parent_x + (parent_width // 2) - (dialog_width // 2)
+    y = parent_y + (parent_height // 2) - (dialog_height // 2)
+
+    choice_dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
     
     selected_format = None
     
@@ -133,7 +145,7 @@ What it does:
 • Keeps your game library organized
 
 Best for:
-• PS1 games like Final Fantasy VII, VIII, IX
+• PS1 multi-disc games
 • PS2 multi-disc games
 • Dreamcast multi-disc games
 • Sega Saturn multi-disc games

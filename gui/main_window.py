@@ -855,7 +855,8 @@ class RomMateGUI:
             )
             
             if cancelled:
-                # User cancelled
+                # User cancelled - return to main panel immediately
+                self.reset_and_return()
                 return
             
             if created == 0 and skipped == 0:
