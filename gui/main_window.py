@@ -209,15 +209,47 @@ class RomMateGUI:
             
             # Check if it's a directory
             if os.path.isdir(dropped_path):
-                self.folder_path.set(dropped_path)
+                self.update_folder_display(dropped_path)
                 self.config.set('last_folder', dropped_path)
             else:
                 # If a file was dropped, use its parent directory
                 parent_dir = os.path.dirname(dropped_path)
-                self.folder_path.set(parent_dir)
+                self.update_folder_display(parent_dir)
                 self.config.set('last_folder', parent_dir)
         except Exception as e:
             print(f"Error handling drop: {e}")    
+
+    def add_placeholder_to_entry(self):
+        """Add placeholder text to folder entry"""
+        placeholder = "⬇️  Drop folder here"
+        
+        # Center the placeholder text
+        self.folder_entry.config(justify='center')
+        
+        # Set placeholder if empty
+        if not self.folder_path.get():
+            self.folder_entry.insert(0, placeholder)
+            self.folder_entry.config(fg=self.text_gray)
+        
+        # Remove placeholder on click
+        def on_focus_in(event):
+            if self.folder_entry.get() == placeholder:
+                self.folder_entry.delete(0, tk.END)
+                self.folder_entry.config(fg=self.text_light, justify='left')
+        
+        # Restore placeholder if empty
+        def on_focus_out(event):
+            if not self.folder_entry.get():
+                self.folder_entry.insert(0, placeholder)
+                self.folder_entry.config(fg=self.text_gray, justify='center')
+        
+        self.folder_entry.bind('<FocusIn>', on_focus_in)
+        self.folder_entry.bind('<FocusOut>', on_focus_out)
+
+    def update_folder_display(self, folder):
+        """Update the folder entry with selected path"""
+        self.folder_path.set(folder)
+        self.folder_entry.config(fg=self.text_light, justify='left')
 
     def show_completion(self, success=True, converted=0, skipped=0, failed=0):
         """Show completion state in processing panel"""
@@ -300,7 +332,7 @@ class RomMateGUI:
 
         tk.Label(
             folder_frame,
-            text="Game Folder:" + (" (Drag & Drop)" if DND_AVAILABLE else ""),
+            text="Game Folder:",
             font=("Arial", 11, "bold"),
             bg=self.bg_dark,
             fg=self.text_light,
@@ -321,6 +353,9 @@ class RomMateGUI:
             highlightcolor=self.accent_blue,
         )
         self.folder_entry.pack(side="left", padx=10, fill="x", expand=True, ipady=6)
+
+        # Add placeholder text
+        self.add_placeholder_to_entry()
 
         browse_btn = tk.Button(
             folder_frame,
@@ -745,7 +780,7 @@ class RomMateGUI:
         
         if folder:
             folder = normalize_path(folder)
-            self.folder_path.set(folder)
+            self.update_folder_display(folder)
             
             # Remember this folder for next time
             self.config.set('last_folder', folder)
