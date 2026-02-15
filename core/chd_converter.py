@@ -204,7 +204,7 @@ class CHDConverter:
             return False, None
     
     def convert_folder(self, folder, delete_after=False, 
-                      log_callback=None, progress_callback=None, animation_callback=None):
+                      log_callback=None, progress_callback=None, animation_callback=None, cancel_check=None):
         """Convert all disc images in a folder to CHD
         
         Args:
@@ -213,6 +213,7 @@ class CHDConverter:
             log_callback (callable): Function to call with log messages
             progress_callback (callable): Function to call with progress updates
                                         Should accept (current, total, filename) args
+            cancel_check (callable): Function to call to check if cancellation was requested
         
         Returns:
             tuple: (converted, skipped, failed) - counts of each outcome
@@ -244,6 +245,12 @@ class CHDConverter:
         failed = 0
         
         for index, source_file in enumerate(source_files, 1):
+            # Check if cancellation was requested
+            if cancel_check and cancel_check():
+                if log_callback:
+                    log_callback("❌ Conversion cancelled by user")
+                return converted, skipped, failed
+            
             if progress_callback:
                 progress_callback(index, total_files, source_file.name)
             
@@ -258,12 +265,25 @@ class CHDConverter:
             if log_callback:
                 log_callback(f"🔄 Converting: {source_file.name}")
             
-            success, _ = self.convert_file(
+            success, chd_path = self.convert_file(
                 source_file, 
                 delete_after=delete_after,
                 log_callback=log_callback,
                 animation_callback=animation_callback
             )
+            
+            # If conversion was cancelled mid-file, delete the partial CHD
+            if cancel_check and cancel_check():
+                if chd_path and os.path.exists(chd_path):
+                    try:
+                        os.remove(chd_path)
+                        if log_callback:
+                            log_callback(f"   🗑️ Deleted incomplete: {os.path.basename(chd_path)}")
+                    except:
+                        pass
+                if log_callback:
+                    log_callback("❌ Conversion cancelled by user")
+                return converted, skipped, failed
             
             if success:
                 if log_callback:

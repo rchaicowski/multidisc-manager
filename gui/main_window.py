@@ -65,6 +65,7 @@ class RomMateGUI:
 
         # Processing state
         self.is_processing = False
+        self.cancel_requested = False
         self.spinner_running = False
         self.spinner_chars = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
         self.spinner_index = 0
@@ -114,6 +115,9 @@ class RomMateGUI:
         self.main_container.pack_forget()
         self.processing_panel.pack(fill="both", expand=True, padx=30, pady=20)
 
+        # Reset cancellation flag
+        self.cancel_requested = False
+
         # Reset processing panel
         self.status_title.config(text="Starting", fg=self.text_light)
         self.status_subtitle.config(text="Initializing")
@@ -125,7 +129,8 @@ class RomMateGUI:
         self.processing_log.delete(1.0, tk.END)
         self.processing_log.config(state="disabled")
 
-        # Hide completion buttons
+        # Show cancel button, hide completion buttons
+        self.cancel_frame.pack(pady=10)
         self.completion_frame.pack_forget()
 
         # Start spinner
@@ -256,6 +261,9 @@ class RomMateGUI:
         # Stop spinner
         self.stop_spinner()
 
+        # Hide cancel button, show completion buttons
+        self.cancel_frame.pack_forget()
+
         # Play sound
         self.sound_player.play("success" if success else "fail")
 
@@ -283,6 +291,23 @@ class RomMateGUI:
         self.is_processing = False
         self.processing_panel.config(bg=self.bg_frame)
         self.show_main_panel()
+
+    def cancel_processing(self):
+        """Cancel the current processing operation"""
+        if not self.is_processing:
+            return
+        
+        response = messagebox.askyesno(
+            "Cancel Processing",
+            "Are you sure you want to cancel?\n\n"
+            "Any incomplete CHD files will be deleted.",
+            icon='warning'
+        )
+        
+        if response:
+            self.cancel_requested = True
+            self.log_to_processing("\n⚠️ Cancellation requested...")
+            self.log_to_processing("Cleaning up and returning to main screen...")
 
     def update_options_visibility(self):
         """Show/hide options based on selected mode"""
@@ -724,6 +749,25 @@ class RomMateGUI:
         )
         self.processing_log.pack(fill="both", expand=True, padx=1, pady=1)
 
+        # Cancel button (shown during processing)
+        self.cancel_frame = tk.Frame(self.processing_panel, bg=self.bg_frame)
+        self.cancel_frame.pack(pady=10)
+
+        self.cancel_btn = tk.Button(
+            self.cancel_frame,
+            text="✖ Cancel",
+            command=self.cancel_processing,
+            font=("Arial", 11, "bold"),
+            bg=self.accent_red,
+            fg="white",
+            cursor="hand2",
+            padx=25,
+            pady=10,
+            relief="flat",
+            activebackground="#d32f2f"
+        )
+        self.cancel_btn.pack()
+
         # Completion buttons (hidden until done)
         self.completion_frame = tk.Frame(
             self.processing_panel, bg=self.bg_frame)
@@ -896,8 +940,14 @@ class RomMateGUI:
                     total,
                     filename
                 ),
-                animation_callback=self.animate_processing_dots
+                animation_callback=self.animate_processing_dots,
+                cancel_check=lambda: self.cancel_requested
             )
+            
+            # Check if user cancelled
+            if self.cancel_requested:
+                self.reset_and_return()
+                return
             
             if converted == 0 and skipped == 0 and failed == 0:
                 self.log_to_processing("\n❌ No convertible files found.")
@@ -909,6 +959,11 @@ class RomMateGUI:
             self.log_to_processing("\n" + "=" * 60)
             self.log_to_processing(f"✅ Converted: {converted} | ⏭️ Skipped: {skipped} | ❌ Failed: {failed}")
             self.log_to_processing("=" * 60)
+            
+            # Check if cancelled before showing success
+            if self.cancel_requested:
+                self.reset_and_return()
+                return
             
             success = failed == 0
             self.show_completion(success=success, converted=converted, skipped=skipped, failed=failed)
@@ -1039,7 +1094,8 @@ class RomMateGUI:
                     total,
                     filename
                 ),
-                animation_callback=self.animate_processing_dots
+                animation_callback=self.animate_processing_dots,
+                cancel_check=lambda: self.cancel_requested
             )
             
             if converted > 0 or skipped > 0:
@@ -1089,6 +1145,11 @@ class RomMateGUI:
             self.log_to_processing("\n" + "=" * 60)
             self.log_to_processing("✅ ALL OPERATIONS COMPLETE!")
             self.log_to_processing("=" * 60)
+            
+            # Check if cancelled before showing completion
+            if self.cancel_requested:
+                self.reset_and_return()
+                return
             
             self.show_completion(success=True, converted=converted, skipped=0, failed=0)
         
