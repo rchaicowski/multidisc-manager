@@ -15,6 +15,7 @@ import subprocess
 import platform
 import shutil
 from gui.theme import Theme
+from gui.settings_panel import SettingsPanel
 from utils.sounds import SoundPlayer
 from core.file_utils import normalize_path, detect_available_formats, find_multidisc_games, create_m3u_file
 from gui.dialogs import show_format_choice_dialog, show_info_dialog
@@ -71,6 +72,21 @@ class RomMateGUI:
         self.spinner_index = 0
 
         self.create_widgets()
+
+        # Create settings panel
+        self.settings_panel = SettingsPanel(
+            self.root,
+            self.config,
+            callbacks={
+                'get_sounds_enabled': lambda: self.sounds_enabled.get(),
+                'on_sound_toggle': self.on_sound_toggle,
+                'get_delete_after_conversion': lambda: self.delete_after_conversion.get(),
+                'on_delete_toggle': self.on_delete_toggle,
+                'on_volume_change': self.on_volume_change,
+                'show_help': self.show_info,
+                'on_close': self.hide_settings_panel
+            }
+        )
 
         # Enable drag and drop if available
         if DND_AVAILABLE:
@@ -331,15 +347,35 @@ class RomMateGUI:
         # Main container (for configuration)
         self.main_container = tk.Frame(self.root, bg=self.bg_dark)
 
-        # Title
+        # Title section with settings button
+        title_outer = tk.Frame(self.main_container, bg=self.bg_dark)
+        title_outer.pack(fill="x", pady=(10, 5))
+
+        # Settings button (absolute positioned in top right)
+        settings_btn = tk.Button(
+            title_outer,
+            text="⚙️",
+            command=self.show_settings_panel,
+            font=("Arial", 20),
+            bg=self.bg_dark,
+            fg=self.text_light,
+            cursor="hand2",
+            relief="flat",
+            activebackground=self.bg_frame,
+            bd=0,
+            padx=10
+        )
+        settings_btn.place(relx=1.0, x=-10, y=0, anchor="ne")
+
+        # Title (centered)
         title_label = tk.Label(
-            self.main_container,
+            title_outer,
             text="RomMate",
             font=("Arial", 24, "bold"),
             bg=self.bg_dark,
             fg=self.text_light,
         )
-        title_label.pack(pady=(10, 5))
+        title_label.pack()
 
         # Description
         desc_label = tk.Label(
@@ -1157,5 +1193,29 @@ class RomMateGUI:
             self.log_to_processing(f"\n❌ ERROR: {str(e)}")
             messagebox.showerror("Error", f"An error occurred:\n{str(e)}")
             self.show_completion(success=False)
+
+    def on_sound_toggle(self, enabled):
+        """Handle sound toggle"""
+        self.sounds_enabled.set(enabled)
+        self.config.set('sound_enabled', enabled)
+
+    def on_delete_toggle(self, enabled):
+        """Handle delete toggle"""
+        self.delete_after_conversion.set(enabled)
+        self.config.set('delete_after_conversion', enabled)
+
+    def on_volume_change(self, volume):
+        """Handle volume change"""
+        # TODO: Apply volume to sound player
+        pass
+
+    def show_settings_panel(self):
+        """Show settings panel"""
+        self.main_container.pack_forget()
+        self.settings_panel.show()
+
+    def hide_settings_panel(self):
+        """Show main panel after settings closes"""
+        self.show_main_panel()
 
 
