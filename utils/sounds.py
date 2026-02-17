@@ -12,7 +12,23 @@ class SoundPlayer:
     def __init__(self):
         """Initialize sound player and check for sound files"""
         self.sounds_enabled = True
-        self.volume = 1.0  # Volume from 0.0 to 1.0
+        self.volume = 1.0
+        
+        # Initialize Windows volume control
+        self.windows_volume = None
+        if platform.system() == 'Windows':
+            try:
+                from pycaw.pycaw import AudioUtilities
+                
+                # Get the default audio output device (new API)
+                devices = AudioUtilities.GetSpeakers()
+                
+                # Access EndpointVolume directly (new pycaw API)
+                self.windows_volume = devices.EndpointVolume
+                
+                print("Windows volume control initialized successfully")
+            except Exception as e:
+                print(f"Windows volume control not available: {e}")
         
         # Sound files are in the sounds/ directory at project root
         sounds_dir = os.path.join(os.path.dirname(__file__), '..', 'sounds')
@@ -50,8 +66,18 @@ class SoundPlayer:
         try:
             if platform.system() == 'Windows':
                 import winsound
-                # Note: winsound doesn't support volume control
+                
+                # Set system volume if we have control
+                if self.windows_volume:
+                    try:
+                        # Set volume (0.0 to 1.0 scale)
+                        self.windows_volume.SetMasterVolumeLevelScalar(volume, None)
+                    except Exception as e:
+                        print(f"Could not set volume: {e}")
+                
+                # Play sound asynchronously
                 winsound.PlaySound(sound_path, winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
+                
             elif platform.system() == 'Darwin':  # macOS
                 # afplay doesn't have easy volume control
                 subprocess.Popen(['afplay', sound_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
