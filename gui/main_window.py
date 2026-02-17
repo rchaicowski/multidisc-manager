@@ -27,7 +27,7 @@ class RomMateGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("RomMate")
-        self.root.geometry("850x870")
+        self.root.geometry("850x1000")
         self.root.resizable(True, True)
 
         # Use theme colors
@@ -327,23 +327,7 @@ class RomMateGUI:
             self.log_to_processing("\n⚠️ Cancellation requested...")
             self.log_to_processing("Cleaning up and returning to main screen...")
 
-    def update_options_visibility(self):
-        """Show/hide options based on selected mode"""
-        self.m3u_options.pack_forget()
-        self.chd_options.pack_forget()
-        self.both_options.pack_forget()
 
-        mode = self.operation_mode.get()
-
-        if mode == "chd":
-            self.chd_options.pack(fill="x")
-            self.process_btn.config(text="▶ Convert to CHD")
-        elif mode == "m3u":
-            self.m3u_options.pack(fill="x")
-            self.process_btn.config(text="▶ Create M3U Files")
-        else:  # both
-            self.both_options.pack(fill="x")
-            self.process_btn.config(text="▶ Convert & Create M3U")
 
     def create_widgets(self):
         # Main container (for configuration)
@@ -437,77 +421,71 @@ class RomMateGUI:
         )
         browse_btn.pack(side="left")
 
-        # Operation mode selection
-        mode_frame = tk.Frame(
+        # ===== DISC-BASED ROMS SECTION =====
+        disc_frame = tk.Frame(
             self.main_container, bg=self.bg_frame, relief="groove", bd=2
         )
-        mode_frame.pack(pady=20, fill="x")
+        disc_frame.pack(pady=20, fill="x")
 
         tk.Label(
-            mode_frame,
-            text="What do you want to do?",
+            disc_frame,
+            text="📀 Disc-Based ROMs",
             font=("Arial", 12, "bold"),
             bg=self.bg_frame,
             fg=self.text_light,
         ).pack(anchor="w", padx=25, pady=(15, 10))
 
-        chd_radio = tk.Radiobutton(
-            mode_frame,
+        tk.Radiobutton(
+            disc_frame,
             text="💾 Convert to CHD (compress disc images)",
             variable=self.operation_mode,
             value="chd",
             font=("Arial", 11),
-            command=self.update_options_visibility,
+            command=self.update_info_section,
             bg=self.bg_frame,
             fg=self.text_light,
             selectcolor=self.bg_dark,
             activebackground=self.bg_frame,
-            activeforeground=self.text_light,
             bd=0,
             highlightthickness=0,
-        )
-        chd_radio.pack(anchor="w", padx=25, pady=8)
+        ).pack(anchor="w", padx=25, pady=8)
 
-        m3u_radio = tk.Radiobutton(
-            mode_frame,
+        tk.Radiobutton(
+            disc_frame,
             text="📁 Create M3U Playlists (for multi-disc games)",
             variable=self.operation_mode,
             value="m3u",
             font=("Arial", 11),
-            command=self.update_options_visibility,
+            command=self.update_info_section,
             bg=self.bg_frame,
             fg=self.text_light,
             selectcolor=self.bg_dark,
             activebackground=self.bg_frame,
-            activeforeground=self.text_light,
             bd=0,
             highlightthickness=0,
-        )
-        m3u_radio.pack(anchor="w", padx=25, pady=8)
+        ).pack(anchor="w", padx=25, pady=8)
 
-        both_radio = tk.Radiobutton(
-            mode_frame,
+        tk.Radiobutton(
+            disc_frame,
             text="🔄 Convert to CHD + Create M3U Playlists",
             variable=self.operation_mode,
             value="both",
             font=("Arial", 11),
-            command=self.update_options_visibility,
+            command=self.update_info_section,
             bg=self.bg_frame,
             fg=self.text_light,
             selectcolor=self.bg_dark,
             activebackground=self.bg_frame,
-            activeforeground=self.text_light,
             bd=0,
             highlightthickness=0,
-        )
-        both_radio.pack(anchor="w", padx=25, pady=8)
+        ).pack(anchor="w", padx=25, pady=8)
 
-        tk.Frame(mode_frame, height=1, bg=self.text_gray).pack(
+        tk.Frame(disc_frame, height=1, bg=self.text_gray).pack(
             fill="x", padx=25, pady=15
         )
 
-        info_btn = tk.Button(
-            mode_frame,
+        tk.Button(
+            disc_frame,
             text="ℹ️  Help - When to use each?",
             command=self.show_info,
             font=("Arial", 10),
@@ -515,142 +493,80 @@ class RomMateGUI:
             fg="white",
             cursor="hand2",
             relief="flat",
-            activebackground="#1e88e5",
-            activeforeground="white",
             padx=15,
             pady=6,
-            bd=0,
-        )
-        info_btn.pack(anchor="w", padx=25, pady=(0, 15))
+        ).pack(anchor="w", padx=25, pady=(0, 15))
 
-        # Options frame
-        self.options_frame = tk.Frame(
+        # ===== ROM TOOLS SECTION =====
+        rom_tools_frame = tk.Frame(
             self.main_container, bg=self.bg_frame, relief="groove", bd=2
         )
-        self.options_frame.pack(pady=20, fill="x")
+        rom_tools_frame.pack(pady=20, fill="x")
 
-        self.options_title = tk.Label(
-            self.options_frame,
-            text="Options",
+        tk.Label(
+            rom_tools_frame,
+            text="🎮 ROM Tools (All ROM Types)",
+            font=("Arial", 12, "bold"),
+            bg=self.bg_frame,
+            fg=self.text_light,
+        ).pack(anchor="w", padx=25, pady=(15, 10))
+
+        tk.Radiobutton(
+            rom_tools_frame,
+            text="🔍 Check ROM Health",
+            variable=self.operation_mode,
+            value="health",
+            font=("Arial", 11),
+            command=self.update_info_section,
+            bg=self.bg_frame,
+            fg=self.text_light,
+            selectcolor=self.bg_dark,
+            activebackground=self.bg_frame,
+            bd=0,
+            highlightthickness=0,
+        ).pack(anchor="w", padx=25, pady=8)
+
+        tk.Radiobutton(
+            rom_tools_frame,
+            text="✏️  Validate & Fix ROM Names",
+            variable=self.operation_mode,
+            value="validate",
+            font=("Arial", 11),
+            command=self.update_info_section,
+            bg=self.bg_frame,
+            fg=self.text_light,
+            selectcolor=self.bg_dark,
+            activebackground=self.bg_frame,
+            bd=0,
+            highlightthickness=0,
+        ).pack(anchor="w", padx=25, pady=(8, 15))
+
+        # ===== INFO SECTION (context-sensitive) =====
+        self.info_frame = tk.Frame(
+            self.main_container, bg=self.bg_frame, relief="groove", bd=2
+        )
+        self.info_frame.pack(pady=20, fill="x")
+
+        self.info_title = tk.Label(
+            self.info_frame,
+            text="ℹ️  Info",
             font=("Arial", 12, "bold"),
             bg=self.bg_frame,
             fg=self.text_light,
         )
-        self.options_title.pack(anchor="w", padx=25, pady=(15, 10))
+        self.info_title.pack(anchor="w", padx=25, pady=(15, 10))
 
-        # M3U options
-        self.m3u_options = tk.Frame(self.options_frame, bg=self.bg_frame)
+        # Container for dynamic content
+        self.info_content = tk.Frame(self.info_frame, bg=self.bg_frame)
+        self.info_content.pack(fill="x", padx=25, pady=(0, 15))
 
-        tk.Label(
-            self.m3u_options,
-            text="Scans for: CUE, GDI, CDI, ISO, CHD files",
-            font=("Arial", 10),
-            fg=self.text_gray,
-            bg=self.bg_frame,
-        ).pack(anchor="w", padx=25, pady=(0, 10))
-
-        info_frame = tk.Frame(
-            self.m3u_options, bg="#1a237e", relief="flat", borderwidth=1
-        )
-        info_frame.pack(fill="x", padx=25, pady=(0, 15))
-
-        tk.Label(
-            info_frame,
-            text="ℹ️ Note: All disc files must be in the same folder.\n"
-            "    Works with PSX, PS2, Dreamcast, Saturn, Sega CD, and more!\n"
-            "    If both CUE and CHD files exist, you'll be asked which to use.",
-            font=("Arial", 9),
-            bg="#1a237e",
-            fg="#90caf9",
-            justify="left",
-        ).pack(padx=15, pady=12, anchor="w")
-
-        # CHD options
-        self.chd_options = tk.Frame(self.options_frame, bg=self.bg_frame)
-
-        tk.Label(
-            self.chd_options,
-            text="Converts: CUE, GDI, CDI, ISO → CHD format",
-            font=("Arial", 10),
-            fg=self.text_gray,
-            bg=self.bg_frame,
-        ).pack(anchor="w", padx=25, pady=(0, 15))
-
-        tk.Checkbutton(
-            self.chd_options,
-            text="⚠️ Delete original files after successful conversion",
-            variable=self.delete_after_conversion,
-            font=("Arial", 10),
-            fg=self.accent_red,
-            bg=self.bg_frame,
-            selectcolor=self.bg_dark,
-            activebackground=self.bg_frame,
-            activeforeground=self.accent_red,
-            bd=0,
-            highlightthickness=0,
-        ).pack(anchor="w", padx=25, pady=(0, 10))
-
-        tk.Label(
-            self.chd_options,
-            text="(CHD files are compressed and save 40-60% space)",
-            font=("Arial", 9),
-            fg=self.text_gray,
-            bg=self.bg_frame,
-        ).pack(anchor="w", padx=25, pady=(0, 15))
-
-        # Both options
-        self.both_options = tk.Frame(self.options_frame, bg=self.bg_frame)
-
-        tk.Label(
-            self.both_options,
-            text="Step 1: Convert all disc images to CHD",
-            font=("Arial", 10, "bold"),
-            bg=self.bg_frame,
-            fg=self.text_light,
-        ).pack(anchor="w", padx=25, pady=(0, 5))
-
-        tk.Label(
-            self.both_options,
-            text="  Converts: CUE, GDI, CDI, ISO → CHD",
-            font=("Arial", 9),
-            fg=self.text_gray,
-            bg=self.bg_frame,
-        ).pack(anchor="w", padx=25)
-
-        tk.Label(
-            self.both_options,
-            text="Step 2: Create M3U playlists for multi-disc games",
-            font=("Arial", 10, "bold"),
-            bg=self.bg_frame,
-            fg=self.text_light,
-        ).pack(anchor="w", padx=25, pady=(15, 5))
-
-        tk.Label(
-            self.both_options,
-            text="  Groups CHD files into playlists",
-            font=("Arial", 9),
-            fg=self.text_gray,
-            bg=self.bg_frame,
-        ).pack(anchor="w", padx=25)
-
-        tk.Checkbutton(
-            self.both_options,
-            text="⚠️ Delete original files after successful conversion",
-            variable=self.delete_after_conversion,
-            font=("Arial", 10),
-            fg=self.accent_red,
-            bg=self.bg_frame,
-            selectcolor=self.bg_dark,
-            activebackground=self.bg_frame,
-            activeforeground=self.accent_red,
-            bd=0,
-            highlightthickness=0,
-        ).pack(anchor="w", padx=25, pady=(15, 15))
+        # Create all info sections (hidden by default)
+        self.create_info_sections()
 
         # Process button
         self.process_btn = tk.Button(
             self.main_container,
-            text="▶ Process Files",
+            text="▶ Start Operation",
             command=self.run_process,
             font=("Arial", 14, "bold"),
             bg=self.accent_blue,
@@ -659,49 +575,8 @@ class RomMateGUI:
             height=2,
             padx=50,
             relief="flat",
-            activebackground="#1e88e5",
-            activeforeground="white",
-            bd=0,
         )
         self.process_btn.pack(pady=30)
-
-        # Footer
-        footer_frame = tk.Frame(self.main_container, bg=self.bg_dark)
-        footer_frame.pack(pady=(0, 10))
-
-        def test_sound():
-            if self.sounds_enabled.get():
-                self.sound_player.play("success", self.sound_player.volume)
-
-        sound_check = tk.Checkbutton(
-            footer_frame,
-            text="🔔 Enable sounds"
-            + ("" if self.sound_player.sounds_available else " (sounds not found)"),
-            variable=self.sounds_enabled,
-            command=test_sound,
-            font=("Arial", 9),
-            bg=self.bg_dark,
-            fg=(
-                self.text_gray
-                if self.sound_player.sounds_available
-                else self.accent_red
-            ),
-            selectcolor=self.bg_dark,
-            activebackground=self.bg_dark,
-            activeforeground=self.text_light,
-            bd=0,
-            highlightthickness=0,
-        )
-        sound_check.pack(side="left", padx=(0, 15))
-
-        footer_label = tk.Label(
-            footer_frame,
-            text="Supports PS1, PS2, Dreamcast, Saturn, and other disc-based systems",
-            font=("Arial", 9),
-            fg=self.text_gray,
-            bg=self.bg_dark,
-        )
-        footer_label.pack(side="left")
 
         # ===== PROCESSING PANEL =====
         self.processing_panel = tk.Frame(
@@ -844,12 +719,191 @@ class RomMateGUI:
         ).pack(side="left", padx=10)
 
         # Initialize UI
-        self.update_options_visibility()
         self.show_main_panel()
 
     def show_info(self):
         """Show information about when to use each option"""
         show_info_dialog(self.root)
+
+    def create_info_sections(self):
+        """Create all info section contents"""
+        # CHD Info
+        self.chd_info = tk.Frame(self.info_content, bg=self.bg_frame)
+        tk.Label(
+            self.chd_info,
+            text="Converts: CUE, GDI, CDI, ISO → CHD format",
+            font=("Arial", 10),
+            fg=self.text_gray,
+            bg=self.bg_frame,
+        ).pack(anchor="w", pady=(0, 5))
+        tk.Label(
+            self.chd_info,
+            text="• CHD files are compressed and save 40-60% space",
+            font=("Arial", 9),
+            fg=self.text_gray,
+            bg=self.bg_frame,
+        ).pack(anchor="w", pady=(0, 5))
+        tk.Label(
+            self.chd_info,
+            text="• Supported by RetroArch and most modern emulators",
+            font=("Arial", 9),
+            fg=self.text_gray,
+            bg=self.bg_frame,
+        ).pack(anchor="w")
+
+        # M3U Info
+        self.m3u_info = tk.Frame(self.info_content, bg=self.bg_frame)
+        tk.Label(
+            self.m3u_info,
+            text="Scans for: CUE, GDI, CDI, ISO, CHD files",
+            font=("Arial", 10),
+            fg=self.text_gray,
+            bg=self.bg_frame,
+        ).pack(anchor="w", pady=(0, 10))
+        
+        info_box = tk.Frame(self.m3u_info, bg="#1a237e", relief="flat")
+        info_box.pack(fill="x", pady=(0, 5))
+        tk.Label(
+            info_box,
+            text="ℹ️ Note: All disc files must be in the same folder.\n"
+            "    Works with PSX, PS2, Dreamcast, Saturn, Sega CD, and more!\n"
+            "    If both CUE and CHD files exist, you'll be asked which to use.",
+            font=("Arial", 9),
+            bg="#1a237e",
+            fg="#90caf9",
+            justify="left",
+        ).pack(padx=15, pady=12, anchor="w")
+
+        # Both Info
+        self.both_info = tk.Frame(self.info_content, bg=self.bg_frame)
+        tk.Label(
+            self.both_info,
+            text="Step 1: Convert all disc images to CHD",
+            font=("Arial", 10, "bold"),
+            bg=self.bg_frame,
+            fg=self.text_light,
+        ).pack(anchor="w", pady=(0, 5))
+        tk.Label(
+            self.both_info,
+            text="  Converts: CUE, GDI, CDI, ISO → CHD",
+            font=("Arial", 9),
+            fg=self.text_gray,
+            bg=self.bg_frame,
+        ).pack(anchor="w", pady=(0, 10))
+        tk.Label(
+            self.both_info,
+            text="Step 2: Create M3U playlists for multi-disc games",
+            font=("Arial", 10, "bold"),
+            bg=self.bg_frame,
+            fg=self.text_light,
+        ).pack(anchor="w", pady=(0, 5))
+        tk.Label(
+            self.both_info,
+            text="  Groups CHD files into playlists",
+            font=("Arial", 9),
+            fg=self.text_gray,
+            bg=self.bg_frame,
+        ).pack(anchor="w")
+
+        # Health Check Info
+        self.health_info = tk.Frame(self.info_content, bg=self.bg_frame)
+        tk.Label(
+            self.health_info,
+            text="Verifies ROM file integrity:",
+            font=("Arial", 10),
+            fg=self.text_gray,
+            bg=self.bg_frame,
+        ).pack(anchor="w", pady=(0, 5))
+        tk.Label(
+            self.health_info,
+            text="• Disc ROMs: Verify CHD integrity, check CUE/BIN matching",
+            font=("Arial", 9),
+            fg=self.text_gray,
+            bg=self.bg_frame,
+        ).pack(anchor="w", pady=(0, 3))
+        tk.Label(
+            self.health_info,
+            text="• Cartridge ROMs: Calculate checksums, verify file headers",
+            font=("Arial", 9),
+            fg=self.text_gray,
+            bg=self.bg_frame,
+        ).pack(anchor="w", pady=(0, 3))
+        tk.Label(
+            self.health_info,
+            text="• Compare against known good dumps",
+            font=("Arial", 9),
+            fg=self.text_gray,
+            bg=self.bg_frame,
+        ).pack(anchor="w")
+
+        # Validate Names Info
+        self.validate_info = tk.Frame(self.info_content, bg=self.bg_frame)
+        tk.Label(
+            self.validate_info,
+            text="Checks and fixes ROM filenames:",
+            font=("Arial", 10),
+            fg=self.text_gray,
+            bg=self.bg_frame,
+        ).pack(anchor="w", pady=(0, 5))
+        tk.Label(
+            self.validate_info,
+            text="• Compares against No-Intro/Redump databases",
+            font=("Arial", 9),
+            fg=self.text_gray,
+            bg=self.bg_frame,
+        ).pack(anchor="w", pady=(0, 3))
+        tk.Label(
+            self.validate_info,
+            text="• Suggests correct naming conventions",
+            font=("Arial", 9),
+            fg=self.text_gray,
+            bg=self.bg_frame,
+        ).pack(anchor="w", pady=(0, 3))
+        tk.Label(
+            self.validate_info,
+            text="• Detects region and version information",
+            font=("Arial", 9),
+            fg=self.text_gray,
+            bg=self.bg_frame,
+        ).pack(anchor="w")
+
+        # Show CHD by default
+        self.update_info_section()
+
+    def update_info_section(self):
+        """Update info section based on selected operation"""
+        # Hide all
+        for frame in [self.chd_info, self.m3u_info, self.both_info, 
+                     self.health_info, self.validate_info]:
+            frame.pack_forget()
+        
+        # Get selection (single variable for all operations)
+        operation = self.operation_mode.get()
+        
+        if operation == "health":
+            self.health_info.pack(fill="x")
+            if hasattr(self, 'process_btn'):
+                self.process_btn.config(text="▶ Check ROM Health")
+                
+        elif operation == "validate":
+            self.validate_info.pack(fill="x")
+            if hasattr(self, 'process_btn'):
+                self.process_btn.config(text="▶ Validate ROM Names")
+                
+        elif operation == "chd":
+            self.chd_info.pack(fill="x")
+            if hasattr(self, 'process_btn'):
+                self.process_btn.config(text="▶ Convert to CHD")
+                
+        elif operation == "m3u":
+            self.m3u_info.pack(fill="x")
+            if hasattr(self, 'process_btn'):
+                self.process_btn.config(text="▶ Create M3U Files")
+                
+        elif operation == "both":
+            self.both_info.pack(fill="x")
+            if hasattr(self, 'process_btn'):
+                self.process_btn.config(text="▶ Convert & Create M3U")
 
     def browse_folder(self):
         # Determine initial directory based on folder mode
@@ -873,20 +927,29 @@ class RomMateGUI:
             self.config.set('last_folder', folder)
 
     def run_process(self):
+        """Handle the main process button"""
         folder = self.folder_path.get()
-
+        
         if not folder:
-            messagebox.showwarning(
-                "No Folder", "Please select a game folder first!")
+            messagebox.showwarning("No Folder", "Please select a folder first.")
             return
-
+        
         if not os.path.exists(folder):
             messagebox.showerror(
                 "Error", f"Selected folder does not exist!\n\nPath: {folder}"
             )
             return
-
+        
+        # Get the operation mode
         mode = self.operation_mode.get()
+        
+        # Check if ROM tool is selected
+        if mode == "health":
+            messagebox.showinfo("Coming Soon", "ROM Health Check feature is under development!")
+            return
+        elif mode == "validate":
+            messagebox.showinfo("Coming Soon", "ROM Name Validator feature is under development!")
+            return
         self.is_processing = True
 
         # Switch to processing panel
