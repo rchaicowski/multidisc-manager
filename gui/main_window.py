@@ -1352,8 +1352,9 @@ class RomMateGUI:
                 total_issues = (results['chd_failed'] + 
                               results['cue_failed'] + 
                               results['cart_has_header'] + 
-                              results['cart_unknown'] + 
+                              results['cart_unknown'] +
                               results['cart_failed'])
+                total_hacks = results.get('cart_hacks', 0)
                 
                 # Show summary
                 self.log_to_processing("\n" + "=" * 60)
@@ -1367,9 +1368,10 @@ class RomMateGUI:
                     self.log_to_processing(f"CUE/BIN: ✅ {results['cue_verified']} verified | ❌ {results['cue_failed']} failed")
                 
                 if (results['cart_verified'] + results['cart_has_header'] + 
-                    results['cart_unknown'] + results['cart_failed']) > 0:
+                    results.get('cart_hacks', 0) + results['cart_unknown'] + results['cart_failed']) > 0:
                     self.log_to_processing(f"Cartridges: ✅ {results['cart_verified']} verified | "
                                          f"⚠️ {results['cart_has_header']} have headers | "
+                                         f"🎨 {results.get('cart_hacks', 0)} ROM hacks | "
                                          f"❓ {results['cart_unknown']} unknown | "
                                          f"❌ {results['cart_failed']} failed")
                 
@@ -1377,10 +1379,13 @@ class RomMateGUI:
                 
                 # Show completion
                 if total_issues == 0 and total_verified > 0:
+                    # All verified, no issues (hacks are OK!)
                     self.show_completion(success=True, converted=total_verified, skipped=0, failed=0)
                 elif total_verified > 0:
+                    # Has some issues (unknown or failed)
                     self.show_completion(success=False, converted=total_verified, skipped=0, failed=total_issues)
                 else:
+                    # Nothing verified
                     self.show_completion(success=False, converted=0, skipped=0, failed=total_issues)
                 
             except Exception as e:

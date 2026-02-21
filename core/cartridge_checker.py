@@ -509,10 +509,11 @@ class CartridgeChecker:
             cancel_check (function): Function that returns True if cancelled
             
         Returns:
-            tuple: (verified, has_header, unknown, failed, results)
+            tuple: (verified, has_header, rom_hacks, unknown, failed, results)
         """
         verified = 0
         has_header = 0
+        rom_hacks = 0
         unknown = 0
         failed = 0
         results = []
@@ -617,7 +618,7 @@ class CartridgeChecker:
                     log_callback(f"      Confidence: {result['confidence']}")
                     
             elif result['status'] == 'hack':
-                unknown += 1
+                rom_hacks += 1
                 if log_callback:
                     log_callback(f"   🎨 {result['message']}")
                     log_callback(f"      Type: {result['hack_type'].title()}")
@@ -645,4 +646,4 @@ class CartridgeChecker:
                 if log_callback:
                     log_callback(f"   ❌ {result['message']}")
         
-        return verified, has_header, unknown, failed, results
+        return verified, has_header, rom_hacks, unknown, failed, results

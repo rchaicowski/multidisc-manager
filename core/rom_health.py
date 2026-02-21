@@ -373,11 +373,12 @@ class ROMHealthChecker:
         if log_callback:
             log_callback("\n\n🎮 Checking Cartridge ROMs...")
         
-        cart_verified, cart_header, cart_unknown, cart_failed, cart_results = self.cartridge_checker.check_folder(
+        cart_verified, cart_header, cart_hacks, cart_unknown, cart_failed, cart_results = self.cartridge_checker.check_folder(
             folder, log_callback, progress_callback, cancel_check
         )
         results['cart_verified'] = cart_verified
         results['cart_has_header'] = cart_header
+        results['cart_hacks'] = cart_hacks
         results['cart_unknown'] = cart_unknown
         results['cart_failed'] = cart_failed
         results['all_results'].extend(cart_results)
