@@ -1554,37 +1554,106 @@ class RomMateGUI:
                 messagebox.showwarning("No Selection", "Please select ROMs to fix.")
                 return
             
+            # Close dialog first
+            dialog.destroy()
+            
+            # Get folder path
+            folder = self.folder_path.get()
+            backup_folder = os.path.join(folder, "RomMate_Backups")
+            
+            # Create backup folder if it doesn't exist
+            if backup_var.get():
+                os.makedirs(backup_folder, exist_ok=True)
+            
             # Fix selected ROMs
-            fixed = 0
-            failed = 0
+            fixed_roms = []
+            failed_roms = []
             
             for idx in selected:
                 rom = roms_with_headers[idx]
+                
+                # Create backup in subfolder if requested
+                if backup_var.get():
+                    import shutil
+                    backup_path = os.path.join(backup_folder, os.path.basename(rom['path']))
+                    try:
+                        shutil.copy2(rom['path'], backup_path)
+                    except Exception as e:
+                        failed_roms.append((rom['filename'], f"Backup failed: {str(e)}"))
+                        continue
+                
+                # Remove header (without creating .backup since we already backed up)
                 success, msg = self.rom_health.cartridge_checker.remove_header(
                     rom['path'],
                     rom['header_size'],
-                    backup_var.get()
+                    create_backup=False  # We already created backup in folder
                 )
+                
                 if success:
-                    fixed += 1
+                    fixed_roms.append(rom)
                 else:
-                    failed += 1
+                    failed_roms.append((rom['filename'], msg))
             
-            dialog.destroy()
+            # Re-verify all fixed ROMs
+            if fixed_roms:
+                verified_roms = []
+                still_bad = []
+                
+                for rom in fixed_roms:
+                    # Re-verify
+                    result = self.rom_health.cartridge_checker.verify_rom(rom['path'])
+                    
+                    if result['status'] == 'verified':
+                        verified_roms.append(rom['filename'])
+                    else:
+                        still_bad.append((rom['filename'], result.get('message', 'Unknown status')))
+                
+                # Show results
+                if still_bad:
+                    # Some didn't verify - keep backups!
+                    msg = f"⚠️ Header removal completed but some ROMs still don't verify:\n\n"
+                    msg += f"✅ Successfully verified: {len(verified_roms)}\n"
+                    msg += f"❌ Still not verified: {len(still_bad)}\n\n"
+                    msg += "Failed ROMs:\n"
+                    for filename, status in still_bad:
+                        msg += f"• {filename}: {status}\n"
+                    msg += f"\n💾 Backups kept in: {backup_folder}"
+                    messagebox.showwarning("Partial Success", msg)
+                else:
+                    # All verified successfully!
+                    if backup_var.get():
+                        # Offer to delete backups
+                        response = messagebox.askyesno(
+                            "Headers Removed Successfully!",
+                            f"✅ Successfully removed headers from {len(verified_roms)} ROM(s)!\n"
+                            f"✅ All ROMs verified as good dumps!\n\n"
+                            f"Backups are stored in:\n{backup_folder}\n\n"
+                            f"Would you like to delete the backup folder?",
+                            icon='question'
+                        )
+                        
+                        if response:
+                            # Delete backup folder
+                            import shutil
+                            try:
+                                shutil.rmtree(backup_folder)
+                                messagebox.showinfo("Backups Deleted", "✅ Backup folder deleted successfully!")
+                            except Exception as e:
+                                messagebox.showerror("Error", f"Could not delete backup folder:\n{str(e)}")
+                        else:
+                            messagebox.showinfo("Backups Kept", f"💾 Backups kept in:\n{backup_folder}")
+                    else:
+                        messagebox.showinfo(
+                            "Headers Removed Successfully!",
+                            f"✅ Successfully removed headers from {len(verified_roms)} ROM(s)!\n"
+                            f"✅ All ROMs verified as good dumps!"
+                        )
             
-            # Show result
-            if failed == 0:
-                messagebox.showinfo(
-                    "Headers Removed",
-                    f"✅ Successfully removed headers from {fixed} ROM(s)!\n\n"
-                    f"{'Backups created with .backup extension.' if backup_var.get() else ''}"
-                )
-            else:
-                messagebox.showwarning(
-                    "Partial Success",
-                    f"✅ Fixed: {fixed}\n❌ Failed: {failed}\n\n"
-                    "Check file permissions and try again."
-                )
+            if failed_roms:
+                msg = "❌ Some ROMs failed to process:\n\n"
+                for filename, error in failed_roms:
+                    msg += f"• {filename}: {error}\n"
+                messagebox.showerror("Errors Occurred", msg)
         
         tk.Button(
             btn_frame,
