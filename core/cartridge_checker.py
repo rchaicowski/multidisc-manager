@@ -616,7 +616,7 @@ class CartridgeChecker:
         if not rom_files:
             if log_callback:
                 log_callback("❌ No cartridge ROM files found in folder")
-            return 0, 0, 0, 0, []
+            return 0, 0, 0, 0, 0, []
         
         if log_callback:
             log_callback(f"\n🎮 Found {len(rom_files)} cartridge ROM(s) to verify\n")
