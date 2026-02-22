@@ -313,6 +313,38 @@ class CartridgeChecker:
         
         return False, None, None
     
+    def remove_header(self, rom_file, header_size, create_backup=True):
+        """Remove external header from ROM file
+        
+        Args:
+            rom_file (str): Path to ROM file
+            header_size (int): Size of header in bytes
+            create_backup (bool): Create .backup file before modifying
+            
+        Returns:
+            tuple: (success: bool, message: str)
+        """
+        try:
+            # Create backup if requested
+            if create_backup:
+                import shutil
+                backup_path = rom_file + '.backup'
+                shutil.copy2(rom_file, backup_path)
+            
+            # Read file without header
+            with open(rom_file, 'rb') as f:
+                f.seek(header_size)  # Skip header
+                clean_data = f.read()
+            
+            # Write back without header
+            with open(rom_file, 'wb') as f:
+                f.write(clean_data)
+            
+            return True, f"Header removed successfully ({header_size} bytes)"
+            
+        except Exception as e:
+            return False, f"Error removing header: {str(e)}"
+    
     def verify_rom(self, rom_file):
         """Verify a single ROM file with multi-level verification
         
@@ -331,6 +363,7 @@ class CartridgeChecker:
                 'status': 'unknown',
                 'message': 'Unknown file type',
                 'filename': filename,
+                'path': rom_file,  # Added
                 'system': None
             }
         
@@ -347,6 +380,7 @@ class CartridgeChecker:
                 'status': 'hack',
                 'message': f'{hack_label} Detected',
                 'filename': filename,
+                'path': rom_file,  # Added
                 'system': system,
                 'hack_type': hack_type,
                 'confidence': hack_confidence
@@ -359,6 +393,7 @@ class CartridgeChecker:
                 'status': 'no_database',
                 'message': f'No database available for {system.upper()}',
                 'filename': filename,
+                'path': rom_file,  # Added
                 'system': system
             }
         
@@ -373,6 +408,7 @@ class CartridgeChecker:
                 'status': 'error',
                 'message': 'Could not read ROM file',
                 'filename': filename,
+                'path': rom_file,  # Added
                 'system': system
             }
         
@@ -391,6 +427,7 @@ class CartridgeChecker:
                     'status': 'verified',
                     'message': 'Verified Good Dump',
                     'filename': filename,
+                    'path': rom_file,  # Added
                     'system': system,
                     'game_name': all_matches[0],  # Primary match
                     'all_regions': all_matches,
@@ -402,6 +439,7 @@ class CartridgeChecker:
                     'status': 'verified',
                     'message': 'Verified Good Dump',
                     'filename': filename,
+                    'path': rom_file,  # Added
                     'system': system,
                     'game_name': all_matches[0],
                     'crc32': crc32,
@@ -425,6 +463,7 @@ class CartridgeChecker:
                         'status': 'has_header',
                         'message': 'Has External Header (fixable)',
                         'filename': filename,
+                        'path': rom_file,  # Added
                         'system': system,
                         'game_name': all_matches_clean[0],
                         'all_regions': all_matches_clean,
@@ -437,6 +476,7 @@ class CartridgeChecker:
                         'status': 'has_header',
                         'message': 'Has External Header (fixable)',
                         'filename': filename,
+                        'path': rom_file,  # Added
                         'system': system,
                         'game_name': all_matches_clean[0],
                         'crc32': crc32_clean,
@@ -459,6 +499,7 @@ class CartridgeChecker:
                     'status': 'probable',
                     'message': f'Probable Good Dump ({matches}/3 checksums match)',
                     'filename': filename,
+                    'path': rom_file,  # Added
                     'system': system,
                     'game_name': entry['name'],
                     'confidence': '99%'
@@ -487,6 +528,7 @@ class CartridgeChecker:
                 'status': 'likely',
                 'message': f'Likely Match - Name & Size Match ({int(best_similarity * 100)}% similar)',
                 'filename': filename,
+                'path': rom_file,  # Added
                 'system': system,
                 'game_name': best_match['name'],
                 'confidence': '95%'
@@ -500,6 +542,7 @@ class CartridgeChecker:
                     'status': 'name_match',
                     'message': f'Name Match - Checksum Differs ({int(similarity * 100)}% similar)',
                     'filename': filename,
+                    'path': rom_file,  # Added
                     'system': system,
                     'game_name': entry['name'],
                     'confidence': '80%'
@@ -510,6 +553,7 @@ class CartridgeChecker:
             'status': 'unknown',
             'message': 'Unknown ROM (not in database)',
             'filename': filename,
+            'path': rom_file,  # Added
             'system': system,
             'crc32': crc32
         }

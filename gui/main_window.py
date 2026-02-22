@@ -1392,6 +1392,15 @@ class RomMateGUI:
                 
                 self.log_to_processing("=" * 60)
                 
+                # Check if cancelled
+                if self.cancel_requested:
+                    self.reset_and_return()
+                    return
+                
+                # Offer to fix headers BEFORE showing completion
+                if results.get('cart_has_header', 0) > 0:
+                    self.root.after(100, lambda: self.offer_header_fix(results))
+                
                 # Show completion
                 if total_issues == 0 and total_verified > 0:
                     # All verified, no issues (hacks are OK!)
@@ -1414,6 +1423,222 @@ class RomMateGUI:
         # Start thread
         thread = threading.Thread(target=run_check, daemon=True)
         thread.start()
+
+    def offer_header_fix(self, results):
+        """Offer to fix ROMs with external headers
+        
+        Args:
+            results (dict): Health check results
+        """
+        # Find ROMs with headers
+        roms_with_headers = []
+        for result in results.get('all_results', []):
+            if result.get('status') == 'has_header':
+                roms_with_headers.append(result)
+        
+        if not roms_with_headers:
+            return  # No headers to fix
+        
+        # Create dialog
+        dialog = tk.Toplevel(self.root)
+        dialog.title("External Headers Detected")
+        dialog.configure(bg=self.bg_dark)
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Set size and position
+        dialog.update_idletasks()
+        width = 650
+        height = 600  # Increased height
+        x = (dialog.winfo_screenwidth() // 2) - (width // 2)
+        y = (dialog.winfo_screenheight() // 2) - (height // 2)
+        dialog.geometry(f"{width}x{height}+{x}+{y}")
+
+        # Prevent resizing smaller than minimum
+        dialog.minsize(650, 600)
+        
+        # Title
+        title_frame = tk.Frame(dialog, bg=self.accent_orange, height=60)
+        title_frame.pack(fill="x")
+        title_frame.pack_propagate(False)
+        
+        tk.Label(
+            title_frame,
+            text="⚠️ External Copier Headers Detected",
+            font=("Arial", 14, "bold"),
+            bg=self.accent_orange,
+            fg="white"
+        ).pack(expand=True)
+        
+        # Content
+        content = tk.Frame(dialog, bg=self.bg_dark, padx=20, pady=20)
+        content.pack(fill="both", expand=True)
+        
+        # Explanation
+        tk.Label(
+            content,
+            text=f"{len(roms_with_headers)} ROM(s) have external copier headers:",
+            font=("Arial", 11, "bold"),
+            bg=self.bg_dark,
+            fg=self.text_light
+        ).pack(anchor="w", pady=(0, 10))
+        
+        # ROM list with checkboxes
+        list_frame = tk.Frame(content, bg=self.bg_frame, relief="sunken", bd=1)
+        list_frame.pack(fill="both", expand=True, pady=(0, 15))
+        
+        # Scrollbar
+        scrollbar = tk.Scrollbar(list_frame)
+        scrollbar.pack(side="right", fill="y")
+        
+        rom_listbox = tk.Listbox(
+            list_frame,
+            bg=self.bg_frame,
+            fg=self.text_light,
+            font=("Arial", 10),
+            selectmode=tk.MULTIPLE,
+            yscrollcommand=scrollbar.set,
+            relief="flat",
+            highlightthickness=0
+        )
+        rom_listbox.pack(fill="both", expand=True, padx=5, pady=5)
+        scrollbar.config(command=rom_listbox.yview)
+        
+        # Populate list
+        for rom in roms_with_headers:
+            rom_listbox.insert(tk.END, f"• {rom['filename']} ({rom['header_size']} bytes)")
+        
+        # Select all by default
+        rom_listbox.select_set(0, tk.END)
+        
+        # Info box
+        info_frame = tk.Frame(content, bg="#1a237e", relief="flat", padx=15, pady=12)
+        info_frame.pack(fill="x", pady=(0, 15))
+        
+        tk.Label(
+            info_frame,
+            text="ℹ️ What are external headers?\n\n"
+                 "These are extra bytes added by old ROM copying devices.\n"
+                 "They cause checksum mismatches with databases.\n\n"
+                 "• Safe to remove (not part of original ROM)\n"
+                 "• Improves compatibility with emulators\n"
+                 "• Matches No-Intro standards",
+            font=("Arial", 9),
+            bg="#1a237e",
+            fg="#90caf9",
+            justify="left"
+        ).pack()
+        
+        # Options
+        backup_var = tk.BooleanVar(value=True)
+        tk.Checkbutton(
+            content,
+            text="☑ Create backup before fixing (.backup extension)",
+            variable=backup_var,
+            font=("Arial", 10),
+            bg=self.bg_dark,
+            fg=self.text_light,
+            selectcolor=self.bg_frame,
+            activebackground=self.bg_dark,
+            bd=0,
+            highlightthickness=0
+        ).pack(anchor="w", pady=(0, 15))
+        
+        # Buttons
+        btn_frame = tk.Frame(content, bg=self.bg_dark)
+        btn_frame.pack(fill="x")
+        
+        def fix_headers():
+            selected = rom_listbox.curselection()
+            if not selected:
+                messagebox.showwarning("No Selection", "Please select ROMs to fix.")
+                return
+            
+            # Fix selected ROMs
+            fixed = 0
+            failed = 0
+            
+            for idx in selected:
+                rom = roms_with_headers[idx]
+                success, msg = self.rom_health.cartridge_checker.remove_header(
+                    rom['path'],
+                    rom['header_size'],
+                    backup_var.get()
+                )
+                if success:
+                    fixed += 1
+                else:
+                    failed += 1
+            
+            dialog.destroy()
+            
+            # Show result
+            if failed == 0:
+                messagebox.showinfo(
+                    "Headers Removed",
+                    f"✅ Successfully removed headers from {fixed} ROM(s)!\n\n"
+                    f"{'Backups created with .backup extension.' if backup_var.get() else ''}"
+                )
+            else:
+                messagebox.showwarning(
+                    "Partial Success",
+                    f"✅ Fixed: {fixed}\n❌ Failed: {failed}\n\n"
+                    "Check file permissions and try again."
+                )
+        
+        tk.Button(
+            btn_frame,
+            text="Learn More",
+            command=lambda: messagebox.showinfo(
+                "External Copier Headers",
+                "External headers are NOT part of the original ROM.\n\n"
+                "They were added by devices like:\n"
+                "• Super Magicom\n"
+                "• Game Doctor\n"
+                "• Super Wild Card\n\n"
+                "Removing them:\n"
+                "✅ Makes ROMs match No-Intro databases\n"
+                "✅ Fixes checksum verification\n"
+                "✅ Safe - your ROM data is unchanged\n\n"
+                "The actual cartridge ROM data starts after the header!"
+            ),
+            font=("Arial", 10),
+            bg=self.bg_frame,
+            fg=self.text_light,
+            cursor="hand2",
+            relief="flat",
+            padx=15,
+            pady=8
+        ).pack(side="left", padx=(0, 10))
+        
+        tk.Button(
+            btn_frame,
+            text="Skip",
+            command=dialog.destroy,
+            font=("Arial", 10),
+            bg=self.bg_frame,
+            fg=self.text_light,
+            cursor="hand2",
+            relief="flat",
+            padx=15,
+            pady=8
+        ).pack(side="left", padx=(0, 10))
+        
+        tk.Button(
+            btn_frame,
+            text="✂️ Remove Headers",
+            command=fix_headers,
+            font=("Arial", 10, "bold"),
+            bg=self.accent_green,
+            fg="white",
+            cursor="hand2",
+            relief="flat",
+            padx=20,
+            pady=8
+        ).pack(side="right")
+        
+        # Make ESC close dialog
+        dialog.bind('<Escape>', lambda e: dialog.destroy())
 
     def on_sound_toggle(self, enabled):
         """Handle sound toggle"""
